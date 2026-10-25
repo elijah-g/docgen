@@ -1,0 +1,48 @@
+/*
+ * Print styles: large screenshots, numbered steps, no nav/sidebar/toc/search.
+ * PDF generation itself is engine-side (later); this only makes the browser's
+ * own "Print to PDF" produce a usable printable guide for a single page.
+ */
+@media print {
+  nav,
+  aside,
+  header,
+  [data-search],
+  .fd-sidebar,
+  .fd-toc,
+  .docgen-video {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  h2,
+  h3,
+  h4 {
+    page-break-after: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .docgen-last-checked {
+    display: block !important;
+  }
+}

@@ -1,0 +1,272 @@
+[
+  {
+    "id": "add-competitor-and-entry",
+    "title": "Add a new competitor and their first entry",
+    "for": "Show office staff and secretaries taking entries at the office or over the phone",
+    "start": {
+      "page": "/dashboard",
+      "role": "office_staff"
+    },
+    "steps": [
+      {
+        "n": 1,
+        "title": "Check the current show",
+        "instruction": "Sign in and start on the Dashboard. Check the Current show at the bottom of the left-hand menu is the show you're taking entries for.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-01.png",
+        "videoTimeSec": 7.2
+      },
+      {
+        "n": 2,
+        "title": "Open Competitors",
+        "instruction": "Click Competitors in the left-hand menu.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-02.png",
+        "videoTimeSec": 13.825000000000001
+      },
+      {
+        "n": 3,
+        "title": "Search before you add",
+        "instruction": "Competitors are shared across all your shows. Type the person's name into Search competitors... first, so you don't create a duplicate. If they're already listed, skip ahead to their profile.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-03.png",
+        "videoTimeSec": 17.325000000000003
+      },
+      {
+        "n": 4,
+        "title": "Add New Competitor",
+        "instruction": "No match? Click Add New Competitor at the top right.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-04.png",
+        "videoTimeSec": 24.624999999999996
+      },
+      {
+        "n": 5,
+        "title": "Enter their name",
+        "instruction": "Enter the competitor's First Name and Last Name (both required, at least two characters).",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-05.png",
+        "videoTimeSec": 28.275
+      },
+      {
+        "n": 6,
+        "title": "Add contact details",
+        "instruction": "Email and Phone are optional. With an email address, TallyUp sends the competitor an entry confirmation and you can email them a payment link later.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-06.png",
+        "videoTimeSec": 34.12437418960611
+      },
+      {
+        "n": 7,
+        "title": "Create Competitor",
+        "instruction": "Click Create Competitor. A Competitor created message appears and you're returned to the competitor list.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-07.png",
+        "videoTimeSec": 44.32437418960623
+      },
+      {
+        "n": 8,
+        "title": "Open their profile",
+        "instruction": "Search for the competitor again and click View on their row to open their profile.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-08.png",
+        "videoTimeSec": 50.049374189606226
+      },
+      {
+        "n": 9,
+        "title": "Add Entry",
+        "instruction": "The profile shows their details and entries for this show (none yet). Under Quick Actions, click Add Entry.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-09.png",
+        "videoTimeSec": 55.747091775592466
+      },
+      {
+        "n": 10,
+        "title": "Competitor already selected",
+        "instruction": "The Add New Entry form opens with the competitor already selected.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-10.png",
+        "videoTimeSec": 61.59709177559247
+      },
+      {
+        "n": 11,
+        "title": "Choose a class",
+        "instruction": "Click Select a class... and search by class name, code or section — for example banana — then click the class (shown as code and name, e.g. CK03 - Banana bread).",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-11.png",
+        "videoTimeSec": 66.69709177559247
+      },
+      {
+        "n": 12,
+        "title": "Entry number and fee",
+        "instruction": "For automatically numbered classes the form notes Entry numbers will be assigned automatically when you submit. The Entry Summary on the right adds up the fees. (Classes with hand-entered numbers, such as poultry cage numbers, show an Entry Number (Optional) box instead.)",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-12.png",
+        "videoTimeSec": 73.59709177559249
+      },
+      {
+        "n": 13,
+        "title": "Optional description",
+        "instruction": "Optionally add an Entry Description. To enter the same competitor in more classes, click Add Another Entry and repeat for each class.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-13.png",
+        "videoTimeSec": 82.7970917755925
+      },
+      {
+        "n": 14,
+        "title": "Submit Entry",
+        "instruction": "Check the details and click Submit Entry.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-14.png",
+        "videoTimeSec": 89.97209177559256
+      },
+      {
+        "n": 15,
+        "title": "Entry submitted",
+        "instruction": "The entry is saved with its entry number and shows Payment Pending. Choose Send Link to email a secure payment link, or Record Payment for cash or EFTPOS. Create Another Entry starts a fresh form.",
+        "screenshot": "/screenshots/add-competitor-and-entry/step-15.png",
+        "videoTimeSec": 93.6470917755926
+      }
+    ],
+    "impactRoutes": [
+      "/dashboard/competitors",
+      "/dashboard/competitors/5e81b64a-5237-4604-89b9-e425388658db?show=d0000000-0000-4000-8000-0000000000b1",
+      "/dashboard/competitors/new",
+      "/dashboard/entries/new?competitor=5e81b64a-5237-4604-89b9-e425388658db&show=d0000000-0000-4000-8000-0000000000b1",
+      "/dashboard/entries/success/be40172e-6796-4fca-810c-3b0ff4ca7c5e"
+    ],
+    "lastChecked": "2026-10-22T17:58:08.151Z"
+  },
+  {
+    "id": "filter-unpaid-entries",
+    "title": "Find unpaid entries",
+    "for": "Show office staff following up entry fees",
+    "start": {
+      "page": "/dashboard/entries",
+      "role": "office_staff"
+    },
+    "steps": [
+      {
+        "n": 1,
+        "title": "Open Entries",
+        "instruction": "Click Entries in the left-hand menu.",
+        "screenshot": "/screenshots/filter-unpaid-entries/step-01.png",
+        "videoTimeSec": 5.5
+      },
+      {
+        "n": 2,
+        "title": "Choose Unpaid",
+        "instruction": "Open Payment Status and choose {{filter.status}}.",
+        "screenshot": "/screenshots/filter-unpaid-entries/step-02.png",
+        "videoTimeSec": 7.8999999999999995
+      },
+      {
+        "n": 3,
+        "title": "Apply Filters",
+        "instruction": "Click Apply Filters. The list shows only unpaid entries.",
+        "screenshot": "/screenshots/filter-unpaid-entries/step-03.png",
+        "videoTimeSec": 12.132124840235774
+      }
+    ],
+    "impactRoutes": [
+      "/dashboard/entries?entryNumber=&sectionId=&paymentStatus=unpaid&ticketPrinted="
+    ],
+    "lastChecked": "2026-10-23T01:13:31.412Z"
+  },
+  {
+    "id": "record-a-payment",
+    "title": "Record a payment",
+    "for": "Show office staff taking entry fees at the office",
+    "start": {
+      "page": "/dashboard/payments",
+      "role": "office_staff"
+    },
+    "steps": [
+      {
+        "n": 1,
+        "title": "Open Payments",
+        "instruction": "Click Payments in the left-hand menu.",
+        "screenshot": "/screenshots/record-a-payment/step-01.png",
+        "videoTimeSec": 5.5
+      },
+      {
+        "n": 2,
+        "title": "New Payment",
+        "instruction": "Click New Payment.",
+        "screenshot": "/screenshots/record-a-payment/step-02.png",
+        "videoTimeSec": 7.85
+      },
+      {
+        "n": 3,
+        "title": "Choose the competitor",
+        "instruction": "Click Select competitor... and choose the person who paid.",
+        "screenshot": "/screenshots/record-a-payment/step-03.png",
+        "videoTimeSec": 10.710595784184557
+      },
+      {
+        "n": 4,
+        "title": "Enter the amount",
+        "instruction": "Enter the Amount ($). Payment Type is already Entry Fee and Payment Method is Cash.",
+        "screenshot": "/screenshots/record-a-payment/step-04.png",
+        "videoTimeSec": 15.235595784184556
+      },
+      {
+        "n": 5,
+        "title": "Enter the receipt number",
+        "instruction": "Enter the Receipt Number, if you gave one.",
+        "screenshot": "/screenshots/record-a-payment/step-05.png",
+        "videoTimeSec": 18.08559578418456
+      },
+      {
+        "n": 6,
+        "title": "Save Payment",
+        "instruction": "Click Save Payment. The payment shows in the Payments list.",
+        "screenshot": "/screenshots/record-a-payment/step-06.png",
+        "videoTimeSec": 21.535595784184558
+      }
+    ],
+    "impactRoutes": [
+      "/dashboard/payments/record-payment?showId=d0000000-0000-4000-8000-0000000000b1",
+      "/dashboard/payments?showId=d0000000-0000-4000-8000-0000000000b1"
+    ],
+    "lastChecked": "2026-10-23T01:13:51.022Z"
+  },
+  {
+    "id": "update-a-competitors-phone",
+    "title": "Update a competitor's phone number",
+    "for": "Show office staff keeping competitor details current",
+    "start": {
+      "page": "/dashboard/competitors",
+      "role": "office_staff"
+    },
+    "steps": [
+      {
+        "n": 1,
+        "title": "Search for the competitor",
+        "instruction": "On Competitors, type the person's name in Search.",
+        "screenshot": "/screenshots/update-a-competitors-phone/step-01.png",
+        "videoTimeSec": 5.5
+      },
+      {
+        "n": 2,
+        "title": "Open their profile",
+        "instruction": "Click View on the competitor's row.",
+        "screenshot": "/screenshots/update-a-competitors-phone/step-02.png",
+        "videoTimeSec": 9.624999999999996
+      },
+      {
+        "n": 3,
+        "title": "Edit Profile",
+        "instruction": "Click Edit Profile.",
+        "screenshot": "/screenshots/update-a-competitors-phone/step-03.png",
+        "videoTimeSec": 13.349999999999996
+      },
+      {
+        "n": 4,
+        "title": "Change the phone number",
+        "instruction": "Replace the number in Phone.",
+        "screenshot": "/screenshots/update-a-competitors-phone/step-04.png",
+        "videoTimeSec": 16.096706535517846
+      },
+      {
+        "n": 5,
+        "title": "Save Changes",
+        "instruction": "Click Save Changes. The profile shows the new number.",
+        "screenshot": "/screenshots/update-a-competitors-phone/step-05.png",
+        "videoTimeSec": 19.571706535517848
+      }
+    ],
+    "impactRoutes": [
+      "/dashboard/competitors/d0000000-0000-4000-8000-000000000303/edit?show=d0000000-0000-4000-8000-0000000000b1",
+      "/dashboard/competitors/d0000000-0000-4000-8000-000000000303?show=d0000000-0000-4000-8000-0000000000b1",
+      "/dashboard/competitors?show=d0000000-0000-4000-8000-0000000000b1"
+    ],
+    "lastChecked": "2026-10-23T01:14:25.016Z"
+  }
+]

@@ -1,0 +1,77 @@
+walkthrough: filter-unpaid-entries
+version: 1
+title: Find unpaid entries
+summary: Filter the entries list to show only entries that haven't been paid.
+product: TallyUp
+for: Show office staff following up entry fees
+start:
+  signed_in_as: office_staff
+  page: /dashboard/entries
+  baseUrl: http://127.0.0.1:3100
+  viewport:
+    width: 1440
+    height: 810
+  deviceScaleFactor: 2
+  show: Riverbend Show 2026
+  notes: Runs against the isolated demo database
+    (scripts/tutorial-video/demo-env). All names, emails and phone numbers are
+    synthetic.
+  persona:
+    role: office_staff
+    name: Jordan Avery
+    email: office.demo@example.com
+    cognitoSub: demo-office-sub
+data:
+  filter:
+    status: Unpaid
+intro:
+  eyebrow: TallyUp how-to
+  title: Find unpaid entries
+  subtitle: Filter the entries list by payment status.
+  say: Here's how to find unpaid entries in Tally Up.
+  caption: Here's how to find unpaid entries in TallyUp.
+outro:
+  title: That's it
+  recap:
+    - Open Entries
+    - Choose Unpaid under Payment Status
+    - Apply Filters
+  say: That's it. Choose Unpaid and apply the filter.
+  caption: That's it. Choose Unpaid and apply the filter.
+steps:
+  - id: open-entries
+    chapter: Filter entries
+    title: Open Entries
+    say: Start on Entries.
+    caption: Start on Entries.
+    page_text: Click **Entries** in the left-hand menu.
+    camera: full
+    actions:
+      - do: expect
+        target: { role: heading, name: Entries }
+  - id: choose-unpaid
+    chapter: Filter entries
+    title: Choose Unpaid
+    say: Open Payment Status and choose Unpaid.
+    caption: Open Payment Status and choose Unpaid.
+    page_text: Open **Payment Status** and choose **{{filter.status}}**.
+    camera: { focus: { css: main }, zoom: 1.3 }
+    actions:
+      - do: click
+        target: { role: combobox, hasText: Payment Status }
+        highlight: true
+      - do: click
+        target: { role: option, name: "{{filter.status}}" }
+  - id: apply-filters
+    chapter: Filter entries
+    title: Apply Filters
+    say: Click Apply Filters. The list shows only unpaid entries.
+    caption: Click Apply Filters.
+    page_text: Click **Apply Filters**. The list shows only unpaid entries.
+    camera: full
+    actions:
+      - do: click
+        target: { role: button, name: Apply Filters }
+        highlight: true
+      - do: expect
+        target: { role: cell, name: "{{filter.status}}" }

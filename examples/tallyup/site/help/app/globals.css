@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/style.css";
+
+/*
+ * Theme variables. `docgen init` writes brand.primaryColor/font (guessed by
+ * extractBrand(), packages/engine/src/init/brand.ts) into docgen.config.ts;
+ * copy the resulting values here by hand until the engine writes this file
+ * directly. --font-sans takes a CSS font-family value, not just a name.
+ */
+:root {
+  --docgen-primary: 235 55% 42%; /* H S% L%, no hsl() wrapper */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+@import "./print.css";

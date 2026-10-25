@@ -1,0 +1,21 @@
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# dependencies
+node_modules/
+
+# build output
+dist/
+.build/
+
+# docgen caches
+.docgen-cache/
+
+.tsx-mask-test-*/
+
+# generated example outputs (rebuild with `docgen build`)
+examples/**/videos/
+examples/**/pdf/
+examples/**/public/screenshots/
+examples/**/public/pdf/
+examples/**/public/videos/

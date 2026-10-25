@@ -1,0 +1,76 @@
+:root {
+  --night: hsl(226 58% 10%);
+  --night-2: hsl(224 50% 15%);
+  --ink: hsl(224 42% 14%);
+  --teal: hsl(183 68% 30%);
+  --teal-deep: hsl(191 72% 24%);
+  --aqua: #2de0d0;
+  --sky: #3d9bff;
+  --canvas: hsl(222 30% 97%);
+  --mark: hsl(176 85% 38%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-feature-settings: 'cv11', 'ss01'; color: #fff; }
+
+#frame { position: absolute; inset: 0; overflow: hidden;
+  background:
+    radial-gradient(900px 700px at 86% 64%, hsl(178 100% 45% / .20), transparent 70%),
+    radial-gradient(800px 600px at 104% 104%, hsl(212 100% 55% / .26), transparent 70%),
+    radial-gradient(1000px 700px at -4% -6%, hsl(226 80% 30% / .55), transparent 70%),
+    linear-gradient(160deg, var(--night-2), var(--night) 60%);
+}
+#frame::after { /* faint diagonal sheen */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, transparent 58%, hsl(0 0% 100% / .035) 58.2%, transparent 74%);
+}
+
+/* ---------------- stage: the captured UI */
+#stage { position: absolute; border-radius: 16px; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 1px hsl(0 0% 100% / .10), 0 30px 80px -20px hsl(226 80% 3% / .85), 0 10px 30px -10px hsl(226 80% 3% / .6);
+  transform-origin: 50% 50%; will-change: transform, opacity; }
+#cam { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; transform-origin: 0 0; will-change: transform; }
+#cam img { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; }
+#spot { position: absolute; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--mark), 0 0 0 9px hsl(176 85% 38% / .22), 0 0 0 9999px hsl(226 50% 12% / .20); }
+.ripple { position: absolute; width: 0; height: 0; border-radius: 50%; border: 3px solid var(--mark); pointer-events: none;
+  transform: translate(-50%, -50%); }
+#cursor { position: absolute; left: 0; top: 0; width: 30px; height: 30px; transform-origin: 0 0; pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
+
+/* ---------------- caption band */
+#band { position: absolute; left: 132px; right: 132px; top: 972px; height: 96px; display: flex; align-items: center; gap: 28px; }
+#chip { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; }
+#chip .num { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+  font-weight: 800; font-size: 22px; color: var(--night);
+  background: linear-gradient(135deg, var(--aqua), var(--sky)); }
+#chip .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--aqua); }
+#chip .title { font-size: 21px; font-weight: 700; line-height: 1.15; margin-top: 3px; }
+#caption { flex: 1; font-size: 27px; line-height: 1.32; font-weight: 500; color: hsl(0 0% 100% / .94);
+  text-wrap: balance; }
+
+/* ---------------- title cards */
+.card { position: absolute; inset: 0; padding: 0 168px; display: flex; flex-direction: column; justify-content: center; }
+.brand { display: flex; align-items: center; gap: 18px; font-size: 40px; font-weight: 800; letter-spacing: -.02em; }
+.brand img { width: 64px; height: 64px; }
+.eyebrow-pill { display: inline-block; margin-top: 64px; padding: 10px 20px; border-radius: 999px;
+  border: 1.5px solid hsl(0 0% 100% / .22); font-size: 17px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--aqua); align-self: flex-start; }
+.card h1 { margin-top: 26px; font-size: 92px; line-height: 1.02; font-weight: 800; letter-spacing: -.035em; max-width: 1350px; }
+.card h1 .grad { background: linear-gradient(90deg, var(--aqua), var(--sky)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.card p.sub { margin-top: 28px; font-size: 32px; line-height: 1.4; color: hsl(0 0% 100% / .78); max-width: 1200px; }
+.parts { margin-top: 56px; display: flex; gap: 22px; flex-wrap: wrap; }
+.part { display: flex; align-items: center; gap: 14px; padding: 16px 24px 16px 16px; border-radius: 16px;
+  background: hsl(0 0% 100% / .06); border: 1px solid hsl(0 0% 100% / .12); font-size: 24px; font-weight: 600; }
+.part .n { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; color: var(--night);
+  background: linear-gradient(135deg, var(--aqua), var(--sky)); }
+
+#outro h1 { font-size: 104px; }
+.recap { margin-top: 48px; display: grid; gap: 20px; }
+.recap .row { display: flex; align-items: center; gap: 20px; font-size: 36px; font-weight: 600; }
+.recap .tick { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: linear-gradient(135deg, var(--aqua), var(--sky)); }
+.recap .tick svg { width: 26px; height: 26px; stroke: var(--night); stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.foot { position: absolute; left: 168px; right: 168px; bottom: 150px; display: flex; justify-content: space-between; align-items: center;
+  font-size: 24px; color: hsl(0 0% 100% / .62); }

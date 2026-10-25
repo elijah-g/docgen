@@ -1,0 +1,10 @@
+{
+  "model": "claude-haiku-4-5",
+  "allowedOrigins": [],
+  "retrievalLimit": 5,
+  "maxInputTokens": 8000,
+  "maxOutputTokens": 1024,
+  "unansweredScoreThreshold": 0.01,
+  "rateLimitPerMinute": 20,
+  "globalRateLimitPerMinute": 300
+}

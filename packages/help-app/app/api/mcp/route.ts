@@ -1,0 +1,88 @@
+// Agent connector / MCP server (scope.md "What it produces": "Hosted with the site and
+// versioned with it"; "Safety and trust": "The MCP server is read-only"). The tool
+// implementations live in the engine (`docgen`'s `mcp/` module) — this route only mounts them
+// over the official MCP SDK's Streamable HTTP transport (build-plan.md M15 step 3).
+// Deep import (not the "docgen" package barrel) — see app/api/chat/route.ts for why: the
+// barrel's index.ts reaches config/load.ts's non-literal dynamic `import()`, which breaks
+// bundling a route handler that pulls it in, even transitively.
+import { createDocgenMcpServer, getPageFromLlmsTxt, type DocgenMcpSource } from "docgen/dist/mcp/index.js";
+import type { Procedure } from "docgen/dist/procedures/index.js";
+import type { SearchIndexEntry } from "docgen/dist/index-search/index.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+export const runtime = "nodejs";
+
+// See app/api/chat/route.ts for why this flag exists — static export can't serve this route at
+// all (no persistent process to hold MCP session state), so it answers a clear 501 instead of
+// whatever Next would otherwise do with a dynamic route in a static build.
+const STATIC_EXPORT = process.env.DOCGEN_STATIC_EXPORT === "1";
+
+async function readPublicJson<T>(relPath: string): Promise<T | undefined> {
+  try {
+    const raw = await readFile(join(process.cwd(), "public", relPath), "utf8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readPublicText(relPath: string): Promise<string | undefined> {
+  try {
+    return await readFile(join(process.cwd(), "public", relPath), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+async function buildSource(): Promise<DocgenMcpSource> {
+  const [searchIndexEntries, procedures, llmsTxt] = await Promise.all([
+    readPublicJson<SearchIndexEntry[]>("search-index.json"),
+    readPublicJson<Procedure[]>("procedures.json"),
+    readPublicText("llms.txt"),
+  ]);
+  return {
+    searchIndexEntries: searchIndexEntries ?? [],
+    procedures: procedures ?? [],
+    getPageMarkdown: (slug) => (llmsTxt ? getPageFromLlmsTxt(llmsTxt, slug) : undefined),
+  };
+}
+
+function methodNotSupported(): Response {
+  return new Response(JSON.stringify({ error: "the MCP server is not available on a static export" }), {
+    status: 501,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
+ * Stateless mode (no `sessionIdGenerator`): each request gets a fresh transport + server
+ * connected for the duration of that one request. Simpler and sufficient for docgen's four
+ * read-only, side-effect-free tools — no session state needs to outlive a single call.
+ */
+async function handle(request: Request): Promise<Response> {
+  if (STATIC_EXPORT) return methodNotSupported();
+
+  const source = await buildSource();
+  const server = createDocgenMcpServer(source);
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  await server.connect(transport);
+  try {
+    return await transport.handleRequest(request);
+  } finally {
+    await server.close();
+  }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return handle(request);
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return handle(request);
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  return handle(request);
+}

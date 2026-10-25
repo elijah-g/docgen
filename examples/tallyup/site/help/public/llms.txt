@@ -1,0 +1,287 @@
+# add-competitor-and-entry
+
+# Add a new competitor and their first entry
+
+Create a competitor from the Competitors page, then enter them in a class from their profile. This guide is for show office staff and secretaries taking entries at the office or over the phone.
+
+## Before you start
+
+- Sign in as **office staff**.
+- Make sure **Riverbend Show 2026** is the current show.
+
+## Steps
+
+### Part 1: Add the competitor
+
+#### 1. Check the current show
+
+Sign in and start on the **Dashboard**. Check the **Current show** at the bottom of the left-hand menu is the show you're taking entries for.
+
+![Check the current show](screenshots/step-01.png)
+
+#### 2. Open Competitors
+
+Click **Competitors** in the left-hand menu.
+
+![Open Competitors](screenshots/step-02.png)
+
+#### 3. Search before you add
+
+Competitors are shared across all your shows. Type the person's name into **Search competitors...** first, so you don't create a duplicate. If they're already listed, skip ahead to [their profile](#8-open-their-profile).
+
+![Search before you add](screenshots/step-03.png)
+
+#### 4. Add New Competitor
+
+No match? Click **Add New Competitor** at the top right.
+
+![Add New Competitor](screenshots/step-04.png)
+
+#### 5. Enter their name
+
+Enter the competitor's **First Name** and **Last Name** (both required, at least two characters).
+
+![Enter their name](screenshots/step-05.png)
+
+#### 6. Add contact details
+
+**Email** and **Phone** are optional. With an email address, TallyUp sends the competitor an entry confirmation and you can email them a payment link later.
+
+![Add contact details](screenshots/step-06.png)
+
+#### 7. Create Competitor
+
+Click **Create Competitor**. A *Competitor created* message appears and you're returned to the competitor list.
+
+![Create Competitor](screenshots/step-07.png)
+
+### Part 2: Add the entry
+
+#### 8. Open their profile
+
+Search for the competitor again and click **View** on their row to open their profile.
+
+![Open their profile](screenshots/step-08.png)
+
+#### 9. Add Entry
+
+The profile shows their details and entries for this show (none yet). Under **Quick Actions**, click **Add Entry**.
+
+![Add Entry](screenshots/step-09.png)
+
+#### 10. Competitor already selected
+
+The **Add New Entry** form opens with the competitor already selected.
+
+![Competitor already selected](screenshots/step-10.png)
+
+#### 11. Choose a class
+
+Click **Select a class...** and search by class name, code or section — for example `banana` — then click the class (shown as code and name, e.g. *CK03 - Banana bread*).
+
+![Choose a class](screenshots/step-11.png)
+
+#### 12. Entry number and fee
+
+For automatically numbered classes the form notes *Entry numbers will be assigned automatically when you submit.* The **Entry Summary** on the right adds up the fees. (Classes with hand-entered numbers, such as poultry cage numbers, show an **Entry Number (Optional)** box instead.)
+
+![Entry number and fee](screenshots/step-12.png)
+
+#### 13. Optional description
+
+Optionally add an **Entry Description**. To enter the same competitor in more classes, click **Add Another Entry** and repeat for each class.
+
+![Optional description](screenshots/step-13.png)
+
+#### 14. Submit Entry
+
+Check the details and click **Submit Entry**.
+
+![Submit Entry](screenshots/step-14.png)
+
+#### 15. Entry submitted
+
+The entry is saved with its entry number and shows **Payment Pending**. Choose **Send Link** to email a secure payment link, or **Record Payment** for cash or EFTPOS. **Create Another Entry** starts a fresh form.
+
+![Entry submitted](screenshots/step-15.png)
+
+## Good to know
+
+- Search Competitors first
+- Add New Competitor
+- Open their profile, then Add Entry
+- Choose a class and Submit Entry
+
+---
+
+*Steps verified against the real app on 2026-10-22.*
+
+<!-- docgen:llms-txt-section -->
+
+# filter-unpaid-entries
+
+# Find unpaid entries
+
+Filter the entries list to show only entries that haven't been paid. This guide is for show office staff following up entry fees.
+
+## Before you start
+
+- Sign in as **office staff**.
+- Make sure **Riverbend Show 2026** is the current show.
+
+## Steps
+
+### Part 1: Filter entries
+
+#### 1. Open Entries
+
+Click **Entries** in the left-hand menu.
+
+![Open Entries](screenshots/step-01.png)
+
+#### 2. Choose Unpaid
+
+Open **Payment Status** and choose **\{\{filter.status\}\}**.
+
+![Choose Unpaid](screenshots/step-02.png)
+
+#### 3. Apply Filters
+
+Click **Apply Filters**. The list shows only unpaid entries.
+
+![Apply Filters](screenshots/step-03.png)
+
+## Good to know
+
+- Open Entries
+- Choose Unpaid under Payment Status
+- Apply Filters
+
+---
+
+*Steps verified against the real app on 2026-10-23.*
+
+<!-- docgen:llms-txt-section -->
+
+# record-a-payment
+
+# Record a payment
+
+Record an entry fee a competitor paid at the office. This guide is for show office staff taking entry fees at the office.
+
+## Before you start
+
+- Sign in as **office staff**.
+- Make sure **Riverbend Show 2026** is the current show.
+
+## Steps
+
+### Part 1: Record the payment
+
+#### 1. Open Payments
+
+Click **Payments** in the left-hand menu.
+
+![Open Payments](screenshots/step-01.png)
+
+#### 2. New Payment
+
+Click **New Payment**.
+
+![New Payment](screenshots/step-02.png)
+
+#### 3. Choose the competitor
+
+Click **Select competitor...** and choose the person who paid.
+
+![Choose the competitor](screenshots/step-03.png)
+
+#### 4. Enter the amount
+
+Enter the **Amount ($)**. **Payment Type** is already **Entry Fee** and **Payment Method** is **Cash**.
+
+![Enter the amount](screenshots/step-04.png)
+
+#### 5. Enter the receipt number
+
+Enter the **Receipt Number**, if you gave one.
+
+![Enter the receipt number](screenshots/step-05.png)
+
+#### 6. Save Payment
+
+Click **Save Payment**. The payment shows in the **Payments** list.
+
+![Save Payment](screenshots/step-06.png)
+
+## Good to know
+
+- Open Payments
+- New Payment
+- Choose the competitor
+- Enter the amount and receipt number
+- Save Payment
+
+---
+
+*Steps verified against the real app on 2026-10-23.*
+
+<!-- docgen:llms-txt-section -->
+
+# update-a-competitors-phone
+
+# Update a competitor's phone number
+
+Find a competitor, open their profile, and change their phone number. This guide is for show office staff keeping competitor details current.
+
+## Before you start
+
+- Sign in as **office staff**.
+- Make sure **Riverbend Show 2026** is the current show.
+
+## Steps
+
+### Part 1: Find the competitor
+
+#### 1. Search for the competitor
+
+On **Competitors**, type the person's name in **Search**.
+
+![Search for the competitor](screenshots/step-01.png)
+
+#### 2. Open their profile
+
+Click **View** on the competitor's row.
+
+![Open their profile](screenshots/step-02.png)
+
+### Part 2: Change the phone number
+
+#### 3. Edit Profile
+
+Click **Edit Profile**.
+
+![Edit Profile](screenshots/step-03.png)
+
+#### 4. Change the phone number
+
+Replace the number in **Phone**.
+
+![Change the phone number](screenshots/step-04.png)
+
+#### 5. Save Changes
+
+Click **Save Changes**. The profile shows the new number.
+
+![Save Changes](screenshots/step-05.png)
+
+## Good to know
+
+- Search Competitors
+- Open their profile
+- Edit Profile
+- Change the phone number and save
+
+---
+
+*Steps verified against the real app on 2026-10-23.*

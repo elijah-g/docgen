@@ -1,0 +1,122 @@
+walkthrough: record-a-payment
+version: 1
+title: Record a payment
+summary: Record an entry fee a competitor paid at the office.
+product: TallyUp
+for: Show office staff taking entry fees at the office
+start:
+  signed_in_as: office_staff
+  page: /dashboard/payments
+  baseUrl: http://127.0.0.1:3100
+  viewport:
+    width: 1440
+    height: 810
+  deviceScaleFactor: 2
+  show: Riverbend Show 2026
+  notes: Runs against the isolated demo database
+    (scripts/tutorial-video/demo-env). All names, emails and phone numbers are
+    synthetic.
+  persona:
+    role: office_staff
+    name: Jordan Avery
+    email: office.demo@example.com
+    cognitoSub: demo-office-sub
+data:
+  payment:
+    competitor: Noah Delacroix
+    amount: "4"
+    receipt: R-1042
+intro:
+  eyebrow: TallyUp how-to
+  title: Record a payment
+  subtitle: Record an entry fee paid at the office.
+  say: Here's how to record a payment in Tally Up.
+  caption: Here's how to record a payment in TallyUp.
+outro:
+  title: That's it
+  recap:
+    - Open Payments
+    - New Payment
+    - Choose the competitor
+    - Enter the amount and receipt number
+    - Save Payment
+  say: That's it. Choose the competitor, enter the amount, and save.
+  caption: That's it. Choose the competitor, enter the amount, and save.
+steps:
+  - id: open-payments
+    chapter: Record the payment
+    title: Open Payments
+    say: Start on Payments.
+    caption: Start on Payments.
+    page_text: Click **Payments** in the left-hand menu.
+    camera: full
+    actions:
+      - do: expect
+        target: { role: heading, name: Payments }
+  - id: new-payment
+    chapter: Record the payment
+    title: New Payment
+    say: Click New Payment.
+    caption: Click New Payment.
+    page_text: Click **New Payment**.
+    camera: full
+    actions:
+      - do: click
+        target: { role: link, name: New Payment }
+        highlight: true
+      - do: waitFor
+        target: { role: heading, name: Record Payment }
+  - id: choose-competitor
+    chapter: Record the payment
+    title: Choose the competitor
+    say: Click Select competitor, then choose the person who paid.
+    caption: Choose the person who paid.
+    page_text: Click **Select competitor...** and choose the person who paid.
+    camera: { focus: { css: main }, zoom: 1.3 }
+    actions:
+      - do: click
+        target: { role: combobox, hasText: "Select competitor..." }
+        highlight: true
+      - do: click
+        target: { role: option, name: "{{payment.competitor}}" }
+  - id: enter-amount
+    chapter: Record the payment
+    title: Enter the amount
+    say: Enter the amount they paid.
+    caption: Enter the amount they paid.
+    page_text: Enter the **Amount ($)**. **Payment Type** is already **Entry Fee** and **Payment Method** is **Cash**.
+    camera: { focus: { css: main }, zoom: 1.3 }
+    actions:
+      - do: click
+        target: { label: "Amount ($)" }
+      - do: type
+        target: { label: "Amount ($)" }
+        text: "{{payment.amount}}"
+  - id: enter-receipt
+    chapter: Record the payment
+    title: Enter the receipt number
+    say: Add the receipt number, if you gave one.
+    caption: Add the receipt number, if you gave one.
+    page_text: Enter the **Receipt Number**, if you gave one.
+    camera: { focus: { css: main }, zoom: 1.3 }
+    actions:
+      - do: click
+        target: { label: Receipt Number }
+      - do: type
+        target: { label: Receipt Number }
+        text: "{{payment.receipt}}"
+  - id: save-payment
+    chapter: Record the payment
+    title: Save Payment
+    say: Click Save Payment. It now shows in the payments list.
+    caption: Click Save Payment.
+    page_text: Click **Save Payment**. The payment shows in the **Payments** list.
+    camera: full
+    actions:
+      - do: click
+        target: { role: button, name: Save Payment }
+        highlight: true
+      - do: waitForUrl
+        pattern: /dashboard/payments(\?.*)?$
+      - do: expect
+        target: { role: cell, name: "{{payment.competitor}}" }

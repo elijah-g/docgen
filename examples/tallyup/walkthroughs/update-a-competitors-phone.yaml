@@ -1,0 +1,116 @@
+walkthrough: update-a-competitors-phone
+version: 1
+title: Update a competitor's phone number
+summary: Find a competitor, open their profile, and change their phone number.
+product: TallyUp
+for: Show office staff keeping competitor details current
+start:
+  signed_in_as: office_staff
+  page: /dashboard/competitors
+  baseUrl: http://127.0.0.1:3100
+  viewport:
+    width: 1440
+    height: 810
+  deviceScaleFactor: 2
+  show: Riverbend Show 2026
+  notes: Runs against the isolated demo database
+    (scripts/tutorial-video/demo-env). All names, emails and phone numbers are
+    synthetic.
+  persona:
+    role: office_staff
+    name: Jordan Avery
+    email: office.demo@example.com
+    cognitoSub: demo-office-sub
+data:
+  competitor:
+    search: Delacroix
+    name: Noah Delacroix
+    newPhone: 0491 570 190
+intro:
+  eyebrow: TallyUp how-to
+  title: Update a competitor's phone number
+  subtitle: From the Competitors page to saved contact details.
+  say: Here's how to update a competitor's phone number in Tally Up.
+  caption: Here's how to update a competitor's phone number in TallyUp.
+outro:
+  title: That's it
+  recap:
+    - Search Competitors
+    - Open their profile
+    - Edit Profile
+    - Change the phone number and save
+  say: That's it. Find them, edit their profile, and save the new number.
+  caption: That's it. Find them, edit their profile, and save the new number.
+steps:
+  - id: search-competitor
+    chapter: Find the competitor
+    title: Search for the competitor
+    say: On Competitors, search for the person by name.
+    caption: On Competitors, search for the person by name.
+    page_text: On **Competitors**, type the person's name in **Search**.
+    camera: full
+    actions:
+      - do: expect
+        target: { role: heading, name: Competitors }
+      - do: click
+        target: { placeholder: "Search competitors..." }
+      - do: type
+        target: { placeholder: "Search competitors..." }
+        text: "{{competitor.search}}"
+  - id: open-profile
+    chapter: Find the competitor
+    title: Open their profile
+    say: Click View on their row to open their profile.
+    caption: Click View to open their profile.
+    page_text: Click **View** on the competitor's row.
+    camera: full
+    actions:
+      - do: click
+        target:
+          role: link
+          name: View
+          within: { role: row, hasText: "{{competitor.name}}" }
+        highlight: true
+      - do: waitFor
+        target: { role: heading, name: "{{competitor.name}}" }
+  - id: edit-profile
+    chapter: Change the phone number
+    title: Edit Profile
+    say: Click Edit Profile.
+    caption: Click Edit Profile.
+    page_text: Click **Edit Profile**.
+    camera: full
+    actions:
+      - do: click
+        target: { role: link, name: Edit Profile }
+        highlight: true
+      - do: waitFor
+        target: { role: heading, name: "Edit Competitor: {{competitor.name}}" }
+  - id: change-phone
+    chapter: Change the phone number
+    title: Change the phone number
+    say: Replace the phone number with the new one.
+    caption: Replace the phone number with the new one.
+    page_text: Replace the number in **Phone**.
+    camera: { focus: { css: form }, zoom: 1.3 }
+    actions:
+      - do: click
+        target: { label: Phone }
+      - do: type
+        target: { label: Phone }
+        text: "{{competitor.newPhone}}"
+  - id: save-changes
+    chapter: Change the phone number
+    title: Save Changes
+    say: Click Save Changes. The profile shows the new number.
+    caption: Click Save Changes.
+    page_text: Click **Save Changes**. The profile shows the new number.
+    camera: full
+    actions:
+      - do: click
+        target: { role: button, name: Save Changes }
+        highlight: true
+      - do: waitFor
+        target: { role: heading, name: "{{competitor.name}}" }
+      - do: expect
+        target: { text: "{{competitor.newPhone}}" }

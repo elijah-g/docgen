@@ -1,0 +1,6 @@
+# Help
+
+`docgen build` regenerates this file from your walkthroughs and pages. Until then it just lists
+this placeholder page.
+
+- [Welcome](/): a prescaffolded docgen help app.

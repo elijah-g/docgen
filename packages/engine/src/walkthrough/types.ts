@@ -1,0 +1,114 @@
+import type { Target } from "./target.js";
+import type { Action } from "./action.js";
+
+export type { Target, Highlight } from "./target.js";
+export type { Action } from "./action.js";
+
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+export interface Persona {
+  role?: string;
+  name?: string;
+  email?: string;
+  cognitoSub?: string;
+}
+
+/** Where and as whom the walkthrough starts. TallyUp's `environment`. */
+export interface Start {
+  /** Shorthand for persona.role, e.g. "office-staff". */
+  signed_in_as?: string;
+  /** Path to start on, e.g. "/competitors". TallyUp's startPath. */
+  page?: string;
+  baseUrl?: string;
+  viewport?: Viewport;
+  deviceScaleFactor?: number;
+  show?: string;
+  notes?: string;
+  /** Full persona, when signed_in_as alone isn't enough. */
+  persona?: Persona;
+}
+
+export interface VerifiedAgainst {
+  app?: string;
+  routes?: string[];
+  sources?: string[];
+}
+
+export interface VoiceConfig {
+  provider?: string;
+  model?: string;
+  voiceId?: string;
+  speed?: number;
+  gapSeconds?: number;
+}
+
+export interface TitleCard {
+  eyebrow?: string;
+  title?: string;
+  subtitle?: string;
+  /** Spoken narration, written as it should sound. */
+  say?: string;
+  /** On-screen caption, written as it should be read. */
+  caption?: string;
+  recap?: string[];
+}
+
+export type Camera =
+  | "full"
+  | { focus: Target; zoom?: number; align?: "top" | "right" | "left" };
+
+export interface DatabaseCheck {
+  name: string;
+  sql: string;
+  params?: string[];
+  expect: Record<string, unknown>;
+}
+
+export interface Validate {
+  database?: DatabaseCheck[];
+}
+
+/** One step of a walkthrough: an action plus what it says, shows and checks. */
+export interface Step {
+  id?: string;
+  /** Groups steps into chapters, used for video chapter marks. */
+  chapter?: string;
+  title?: string;
+  /** Spoken narration for this step. */
+  say?: string;
+  /** On-screen caption for this step's clip. */
+  caption?: string;
+  /** Markdown for the printed/site guide. TallyUp's `doc`. */
+  page_text?: string;
+  /** Field names to mask in screenshots/video for this step. */
+  mask?: string[];
+  camera?: Camera;
+  /** Seconds to hold on the step's final state, for pacing. */
+  hold?: number;
+  /** The fully resolved action list — from `do:`, `check:` and/or `actions:`. */
+  actions: Action[];
+}
+
+/** A task a user does, replayed against the real app. The single source of truth. */
+export interface Walkthrough {
+  /** Slug id, e.g. "add-competitor". */
+  walkthrough: string;
+  version?: number;
+  title: string;
+  summary?: string;
+  product?: string;
+  /** Audience/reader, e.g. "office-staff". */
+  for?: string;
+  verifiedAgainst?: VerifiedAgainst;
+  start?: Start;
+  /** Values steps reference as {{path}}. */
+  data?: Record<string, unknown>;
+  voice?: VoiceConfig;
+  intro?: TitleCard;
+  outro?: TitleCard;
+  steps: Step[];
+  validate?: Validate;
+}
