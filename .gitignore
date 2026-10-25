@@ -19,3 +19,6 @@ examples/**/pdf/
 examples/**/public/screenshots/
 examples/**/public/pdf/
 examples/**/public/videos/
+
+# TypeScript incremental build state
+*.tsbuildinfo
