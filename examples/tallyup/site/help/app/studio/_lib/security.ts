@@ -58,8 +58,19 @@ function hostnameOf(hostHeader: string | null): string | undefined {
   return hostHeader.split(":")[0];
 }
 
+/** Extra hostnames the Studio accepts besides localhost, from `DOCGEN_STUDIO_ALLOWED_HOSTS`
+ * (comma-separated, e.g. a dev proxy like "dev.example.com"). Opt-in only: anyone who can reach
+ * an allowed host can edit this help app's files, so only list hosts behind your own sign-in. */
+function allowedHostnames(): Set<string> {
+  const extra = (process.env.DOCGEN_STUDIO_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...LOCAL_HOSTNAMES, ...extra]);
+}
+
 function isLocalHostname(hostname: string | undefined): boolean {
-  return Boolean(hostname) && LOCAL_HOSTNAMES.has(hostname!);
+  return Boolean(hostname) && allowedHostnames().has(hostname!.toLowerCase());
 }
 
 const BODY_METHODS = new Set(["POST", "PUT", "PATCH"]);

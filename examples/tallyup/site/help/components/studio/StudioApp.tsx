@@ -12,9 +12,12 @@ import type { HistoryEntry, StudioManifest, StudioWalkthrough, WalkthroughSummar
 // read this value out of the server-rendered page) from a cross-site one (which can't read it
 // at all) — see app/studio/_lib/security.ts.
 const STUDIO_TOKEN_HEADER = "x-docgen-studio-token";
+const FORBIDDEN_HINT =
+  "The Studio only answers on localhost. Open it at http://localhost:<port>/studio, or start the dev server with DOCGEN_STUDIO_ALLOWED_HOSTS=<this host> if this host is behind your own sign-in.";
 
 async function getJson<T>(url: string, studioToken: string): Promise<T> {
   const res = await fetch(url, { headers: { [STUDIO_TOKEN_HEADER]: studioToken } });
+  if (res.status === 403) throw new Error(FORBIDDEN_HINT);
   if (!res.ok) throw new Error(`${url} -> ${res.status}`);
   return (await res.json()) as T;
 }
@@ -26,6 +29,7 @@ async function postJson<T>(url: string, body: unknown, studioToken: string): Pro
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as T & { error?: string; ok?: boolean };
+  if (res.status === 403) throw new Error(FORBIDDEN_HINT);
   if (!res.ok || data.ok === false) throw new Error(data.error ?? `${url} -> ${res.status}`);
   return data;
 }
@@ -127,7 +131,7 @@ export function StudioApp({ studioToken }: { studioToken: string }) {
   );
 
   return (
-    <div className="grid h-[calc(100vh-3.5rem)] grid-cols-[240px_1fr_360px] overflow-hidden">
+    <div className="grid grid-cols-1 overflow-y-auto lg:h-[calc(100vh-3.5rem)] lg:grid-cols-[240px_1fr_360px] lg:overflow-hidden">
       <aside className="flex flex-col overflow-y-auto border-r">
         <h2 className="border-b p-3 text-sm font-semibold">Walkthroughs</h2>
         <WalkthroughList walkthroughs={walkthroughs} selectedId={selectedId} onSelect={select} />
