@@ -54,9 +54,8 @@ docgen publish --to static --dry-run         # see what would deploy
 Run `docgen` as `npx tsx packages/engine/src/cli.ts` from this repo, or from `packages/engine/dist`
 after `npm run build`. Most commands take `--json` for short, machine-readable output.
 
-Worked examples: [examples/tallyup](examples/tallyup) (Next.js + Postgres + Auth.js, captured
-through its isolated demo environment) and [examples/emh-check](examples/emh-check) (pnpm monorepo,
-local Postgres with demo seed).
+Worked example: [examples/tallyup](examples/tallyup) (Next.js + Postgres + Auth.js, captured
+through its isolated demo environment).
 
 ## Commands
 
@@ -65,12 +64,14 @@ local Postgres with demo seed).
 | `init` | Scaffold the help app into `<dir>/help`, with brand colours and logo guessed from the app |
 | `digest` | Compact map of an app's routes, roles and on-screen labels (monorepos via `--app`, detail via `--area`) |
 | `inspect` | Open one page signed in and list its interactive elements; read-only |
-| `validate`, `import tallyup` | Check walkthrough files; convert TallyUp's `workflow.json` |
+| `validate`, `import tallyup`, `import playwright` | Check walkthrough files; convert TallyUp's `workflow.json` or existing Playwright tests into draft walkthroughs |
 | `capture` | Replay walkthroughs in a browser against the app; screenshots, checks, failure report |
 | `voice`, `render` | Narrate, then render video per scene (only changed scenes re-render) |
 | `pages`, `pdf` | Help pages with numbered screenshots; PDFs and quick reference cards |
 | `qa` | Loudness, black frames, caption timing, personal-data and secret scans |
 | `build` | All of the above in order, skipping unchanged work; writes `report.json` |
+| `affected` | Map a git diff to the walkthroughs it touches; unknown changes mean all |
+| `version freeze`, `version list`, `whats-new` | Freeze a docs version per release; write the What's new page from merged PRs |
 | `edit`, `undo`, `catch-up` | The same edits the Studio makes, with history marked person or agent, and locks |
 | `publish` | Deploy to `vercel`, `netlify`, `amplify`, `cloudflare`, `node` or `static`; first production publish needs a person's OK |
 | `suggest` | Group unanswered chat questions into suggested new walkthroughs |
@@ -108,7 +109,6 @@ other AGENTS.md-reading agents can point at `skills/AGENTS.md`. Validate with
 | `packages/help-app` | The Next.js help app template (site, chat, agent connector, Studio) |
 | `skills/` | Agent skills, subagent definitions and references |
 | `examples/` | Configs, walkthroughs and adapters for the test apps |
-| `reference/tallyup/` | The original TallyUp tutorial pipeline, kept for porting |
 | `docs/` | Scope, decisions, build plan and history |
 
 ## Read first

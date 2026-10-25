@@ -22,3 +22,7 @@ examples/**/public/videos/
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# private-app material, kept local only (not in the public repo)
+/reference/
+/examples/emh-check/

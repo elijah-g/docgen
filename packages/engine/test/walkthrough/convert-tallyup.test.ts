@@ -11,7 +11,7 @@ import {
 } from "../../src/walkthrough/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const workflowPath = join(here, "../../../../reference/tallyup/workflow.json");
+const workflowPath = join(here, "../fixtures/tallyup/workflow.json");
 const raw = JSON.parse(readFileSync(workflowPath, "utf8"));
 
 describe("convertTallyupWorkflow", () => {
