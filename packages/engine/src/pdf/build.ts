@@ -10,6 +10,7 @@ import { checkPersonalData, checkSecrets } from "../qa/index.js";
 import { buildCardHtml, buildCoverHtml, buildPageHtml, buildTocHtml, type TocEntry } from "./html.js";
 import { launchBrowser, renderHtmlToPdf, renderHtmlToPdfBytes, writePdfBytes } from "./render.js";
 import { pdfInputHash, matchesCache, writeCacheSidecar, deletePdfOutput } from "./cache.js";
+import { makeThumbnails } from "./thumbnail.js";
 import type { BuildPdfOptions, ManualBuildResult, PdfBrand, PdfBuildResult, PdfPageInput } from "./types.js";
 
 export { launchBrowser };
@@ -73,7 +74,12 @@ export async function buildWalkthroughPdf(
   }
 
   const pageHtml = buildPageHtml(input, opts.brand, opts.allowRemoteImages);
-  const cardHtml = await fitCardHtml(browser, input, opts.brand, paper);
+  const thumbnails = await makeThumbnails(browser, input.cardSteps.map((s) => s.screenshot));
+  const cardSteps = input.cardSteps.map((s) => ({
+    ...s,
+    thumbnailSrc: s.screenshot ? thumbnails.get(s.screenshot) : undefined,
+  }));
+  const cardHtml = await fitCardHtml(browser, { ...input, cardSteps }, opts.brand, paper);
 
   const problems = [...qaScanHtml(pageHtml), ...qaScanHtml(cardHtml)];
   if (problems.length > 0) {

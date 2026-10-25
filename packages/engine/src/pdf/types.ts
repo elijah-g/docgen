@@ -75,6 +75,13 @@ export interface CardStepInput {
   title: string;
   /** Caption or first sentence of page_text — kept short for the one-page card. */
   text: string;
-  /** Absolute path to the step's screenshot, if any. */
+  /** Absolute path to the step's screenshot, if any. Used for cache fingerprinting (cache.ts)
+   * and as a fallback if no downscaled thumbnail could be made. */
   screenshot?: string;
+  /** Downscaled `data:image/jpeg;...` thumbnail for the quick-reference card (thumbnail.ts),
+   * built from `screenshot` but far smaller — keeps the card well under the 1.78 MB it used to
+   * be when it embedded full-size capture screenshots (build-plan.md M12/M16). Undefined when no
+   * screenshot exists or its thumbnail failed to render; the card then shows no image for that
+   * step rather than falling back to the full-size original. */
+  thumbnailSrc?: string;
 }

@@ -32,10 +32,15 @@ import { concatSegments, isPartialSegmentFile, openRenderBrowser, renderFrameRan
 
 const execFileAsync = promisify(execFile);
 
-/** Default concurrency for parallel scene rendering: a handful of browser pages, capped by
- * CPU headroom so a single build doesn't starve the host. */
+/** Default concurrency for parallel scene rendering: one browser page per CPU (capped at 8) so a
+ * cold render actually uses the host it's given — each worker spends almost all of its time
+ * waiting on Chromium's per-frame `page.evaluate`/`screenshot` round trip (profiled: ~110 s wall
+ * across 17 scenes/1693 frames at concurrency 2 on a 4-core host), not burning a whole CPU core
+ * itself, so running one worker per core (not per two cores, M10's original `cpus/2`) roughly
+ * doubles throughput without starving the host any more than a single full-quality `-preset
+ * slow` ffmpeg encode already would. */
 export function defaultConcurrency(): number {
-  return Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2) || 1));
+  return Math.max(1, Math.min(8, os.cpus().length || 1));
 }
 
 function overlapsRange(a0: number, a1: number, b0: number, b1: number): boolean {

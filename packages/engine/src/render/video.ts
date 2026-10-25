@@ -11,9 +11,14 @@ const execFileAsync = promisify(execFile);
 export function qualityFor(draft: boolean, fpsOverride?: number): RenderQuality {
   // Draft trades resolution for speed via deviceScaleFactor (player.css lays out a fixed
   // 1920x1080 CSS canvas; a 0.5 scale factor screenshots it at 960x540 physical pixels without
-  // touching layout math). Full renders at native 1:1.
-  if (draft) return { fps: fpsOverride ?? 15, crf: 30, preset: "ultrafast", deviceScaleFactor: 0.5 };
-  return { fps: fpsOverride ?? 30, crf: 17, preset: "slow", deviceScaleFactor: 1 };
+  // touching layout math). Full renders at native 1:1. Draft fps is 10 (down from an earlier 15,
+  // M16): a draft preview's job is "does this look right", not smoothness, and every frame not
+  // rendered is one less `page.evaluate`/`screenshot` round trip — the dominant cost of a cold
+  // render (profiled: ~110 s wall across 1693 frames before this change, concurrency aside).
+  // Screenshot JPEG quality is lower for draft too (80 vs full's 95) — a smaller buffer per
+  // frame piped into ffmpeg, never published.
+  if (draft) return { fps: fpsOverride ?? 10, crf: 30, preset: "ultrafast", deviceScaleFactor: 0.5, screenshotQuality: 80 };
+  return { fps: fpsOverride ?? 30, crf: 17, preset: "slow", deviceScaleFactor: 1, screenshotQuality: 95 };
 }
 
 async function openBrowser(): Promise<import("playwright").Browser> {
@@ -28,7 +33,12 @@ async function openPage(
 ): Promise<import("playwright").Page> {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor });
   page.on("pageerror", (e) => console.error("[render]", e.message));
-  await page.goto(`file://${path.join(bundleDir, "index.html")}?render=1`);
+  // `path.resolve` (not a bare join): a relative `bundleDir` — e.g. `docgen render -o dist/videos`
+  // run from a project dir, rather than through build/pipeline.ts, which always resolves outDir
+  // to an absolute path first — produced `file://dist/videos/...`, which Chromium rejects as an
+  // invalid URL (no leading slash). Resolving against `process.cwd()` here matches what the
+  // caller meant regardless of which path got us here.
+  await page.goto(`file://${path.resolve(bundleDir, "index.html")}?render=1`);
   await page.evaluate(() => (document as any).fonts.ready);
   return page;
 }
@@ -164,7 +174,7 @@ export async function renderFrames(
       async (page) => {
         for (let i = 0; i < frames; i++) {
           await page.evaluate((t) => (window as any).renderAt(t), i / quality.fps);
-          const buf = await page.screenshot({ type: "jpeg", quality: 95 });
+          const buf = await page.screenshot({ type: "jpeg", quality: quality.screenshotQuality ?? 95 });
           if (!ff.stdin!.write(buf)) await new Promise((r) => ff.stdin!.once("drain", r));
         }
         ff.stdin!.end();
@@ -216,7 +226,7 @@ export async function renderFrameRange(
   try {
     for (let i = range.start; i < range.end; i++) {
       await page.evaluate((t) => (window as any).renderAt(t), i / quality.fps);
-      const buf = await page.screenshot({ type: "jpeg", quality: 95 });
+      const buf = await page.screenshot({ type: "jpeg", quality: quality.screenshotQuality ?? 95 });
       if (!ff.stdin!.write(buf)) await new Promise((r) => ff.stdin!.once("drain", r));
     }
     ff.stdin!.end();
@@ -247,10 +257,21 @@ export async function openRenderBrowser(
   pageCount: number,
 ): Promise<{ pages: import("playwright").Page[]; close: () => Promise<void> }> {
   const browser = await openBrowser();
-  const pages = await Promise.all(
-    Array.from({ length: pageCount }, () => openPage(browser, bundleDir, deviceScaleFactor)),
-  );
-  return { pages, close: () => browser.close() };
+  try {
+    const pages = await Promise.all(
+      Array.from({ length: pageCount }, () => openPage(browser, bundleDir, deviceScaleFactor)),
+    );
+    return { pages, close: () => browser.close() };
+  } catch (err) {
+    // If any page fails to open (e.g. a bad bundleDir URL), `browser` was never handed back to
+    // the caller for `close()` — without this it leaks: the CDP connection Playwright keeps open
+    // to the still-running Chromium process holds the event loop open, so the whole `docgen
+    // render` process hangs forever instead of reporting the error and exiting (found while
+    // profiling a cold draft render: a bad relative `bundleDir` left a zombie `node`/Chromium
+    // pair running minutes after "render failed" had already been printed).
+    await browser.close().catch(() => {});
+    throw err;
+  }
 }
 
 /** Concatenates already-encoded segments (same codec params, closed GOP) with the ffmpeg

@@ -173,8 +173,11 @@ export function buildCardHtml(title: string, steps: CardStepInput[], brand: PdfB
   const truncated = opts.truncateAt !== undefined && steps.length > opts.truncateAt;
   const rows = shown
     .map((s) => {
-      const thumb =
-        opts.withThumbnails && s.screenshot ? `<img class="thumb" src="file://${encodeURI(s.screenshot)}" alt="" />` : "";
+      // Prefer the pre-downscaled thumbnail (thumbnail.ts) — only fall back to the full-size
+      // screenshot file if no thumbnail could be made, so a thumbnail failure degrades to a
+      // slightly larger card rather than a missing image.
+      const thumbSrc = s.thumbnailSrc ?? (s.screenshot ? `file://${encodeURI(s.screenshot)}` : undefined);
+      const thumb = opts.withThumbnails && thumbSrc ? `<img class="thumb" src="${thumbSrc}" alt="" />` : "";
       return `<div class="card-step">${thumb}<div><strong>${s.number}.</strong> ${escapeHtml(s.text || s.title)}</div></div>`;
     })
     .join("\n");

@@ -117,6 +117,13 @@ export interface RenderQuality {
    * that gives draft its reduced output resolution (e.g. 0.5 -> 960x540) without touching
    * player layout. 1 for full quality. */
   deviceScaleFactor: number;
+  /** JPEG quality (0-100) `page.screenshot()` encodes each frame at before it's piped into
+   * ffmpeg (video.ts) — draft previews don't need the same fidelity a full render does, and a
+   * lower quality is both a smaller buffer to pipe and (per Playwright) a little cheaper for
+   * Chromium to encode. Default 95 (video.ts's long-standing value) when omitted, so existing
+   * `RenderQuality` literals built by hand (tests, other callers) keep behaving exactly as
+   * before. */
+  screenshotQuality?: number;
 }
 
 export interface RenderOptions {
