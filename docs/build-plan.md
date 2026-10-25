@@ -52,12 +52,12 @@ TallyUp's page, screenshots, video and captions from one command.
 | M13 | `docgen publish --to <host>`: Vercel, Netlify, Amplify, Cloudflare (OpenNext), Node, static export; video to blob storage; first publish needs a person's OK | done | 6 host adapters behind an injectable command runner, blob storage adapters, gates (build ok, pages passed, person approval for first prod publish; agents can't self-approve). Dry-runs ok. Real static export unproven (sandbox zod mismatch); chat/MCP route handlers may break `output: export` | Phase 1 |
 | M14 | Second app: pick a workspace app with a different stack, write walkthroughs with the skills, run `docgen build` | done | emh-check (pnpm monorepo, local Postgres + demo seed): 5 walkthroughs build and publish, QA clean, repo unchanged. First-capture pass rate 2/5 (target 80%): writers guess roles, option labels and required fields — `docgen inspect` being added. TallyUp regression: rerun render 310 s -> 23 s via scene reuse | Phase 0 gate (second app) |
 | M15 | Help chat + agent connector (MCP): `search_docs`, `get_page`, `list_walkthroughs`, `get_procedure`; chat answers only from docs with citations; owner's key | done | MCP over Streamable HTTP with 4 read-only tools, verified through the SDK client; chat: BM25 retrieval + current-screen boost, cached system prompt, citations, 503 without key, rate limit, CORS allowlist; unanswered questions redacted, `docgen suggest`; widget.js. No live chat answer tested (no key) | Phase 3 |
-| M16 | Speed + size: cold draft render in well under a minute, cheaper screenshots, card thumbnails downscaled | todo | Follow-ups |
-| M17 | Impact map: `docgen affected --base <ref>` maps a git diff to the walkthroughs it touches (routes, API calls, components, source files); unknown means all | todo | Phase 2 |
+| M16 | Speed + size: cold draft render in well under a minute, cheaper screenshots, card thumbnails downscaled | doing | Follow-ups |
+| M17 | Impact map: `docgen affected --base <ref>` maps a git diff to the walkthroughs it touches (routes, API calls, components, source files); unknown means all | doing | Phase 2 |
 | M18 | GitHub Action + PR check: `docgen ci`, action.yml, PR comment with screenshot diffs, stale pages and preview link; `docgen init --ci` writes the workflow | todo | Phase 2, needs M17 |
 | M19 | Change tiers + repair in CI: cosmetic / broken / new; cosmetic publishes, broken gets a built-in agent repair and a docs PR, new gets a `docs:new` draft; budget cap | todo | Phase 2, needs M17, M18 |
-| M20 | Playwright test import: turn existing Playwright tests into walkthrough drafts | todo | Phase 2 |
-| M21 | Versioned docs + What's new: release tag freezes a version; chat and agent connector answer per version; What's new page from merged PRs | todo | Phase 2 |
+| M20 | Playwright test import: turn existing Playwright tests into walkthrough drafts | done | `docgen import playwright <glob>`: TS compiler API, one draft per `test()`, locator chains to target hints, unmappable calls kept as `# TODO from test:` comments, emails/phones masked. emh-check: 42 specs to 343 drafts, all valid; 35% of calls mapped (schema has no press/hover/focus, many custom helpers, negated asserts) | Phase 2 |
+| M21 | Versioned docs + What's new: release tag freezes a version; chat and agent connector answer per version; What's new page from merged PRs | doing | Phase 2 |
 | M22 | Studio Phase 2: numbered callouts and blur boxes pinned to targets, hold times, simple timeline | todo | Phase 2, after M16 |
 
 ## Log
@@ -91,6 +91,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 
 - 2026-10-23 · Friction fixes done (Sonnet, 227k tokens): target `nth` + inspect within/nth hints for same-name controls, role+text as hasText, inspect opens comboboxes and `--select`, `--area main` fixed, `usage add --estimate` without model, TallyUp help app moved to examples/tallyup/site/help, `--only ... --skip-capture` pipeline bug fixed. Orchestrator verified: typecheck clean, 760 pass / 9 skipped, skills 63/63, ports free, both test repos unchanged (round-3 status snapshots were truncated by the full /tmp; checked against session start and file times instead). M10–M15 done; loop stopped.
 - 2026-10-24 · User: continue. Added M16–M22 (speed follow-ups and Phase 2). Wave 1: M16, M17, M20, M21 in parallel (Sonnet), split by file ownership.
+- 2026-10-25 · Wave 1 had not started (no code found). Initial commit `f34f701` (generated example videos/PDFs ignored; author set repo-local to Bunbury AI). Wave 1 builders launched; orchestrator owns cli.ts, index.ts, package.json and this file.
 
 ## Follow-ups
 
@@ -102,5 +103,6 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Help chat untested with a live key; prompt caching off until a large stable prefix exists.
 - First-capture misses left: values a free-text field accepts, after-save behaviour. Repeatable captures that save data need a demo-data reset per app (emh-check has none).
 - Phase 2 not started: GitHub Action, PR check with screenshot diffs, change tiers, Playwright test import (emh-check's `tests/*-ui/` are good seeds).
+- Playwright import maps 35% of emh-check calls: add `press`/`hover`/`focus` actions and exact-text checks to the walkthrough format to raise it.
 - Phase 1 gate needs an outside vibe coder.
 - Nothing is committed yet.

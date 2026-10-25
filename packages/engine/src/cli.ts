@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { runValidate } from "./commands/validate.js";
 import { runImportTallyup } from "./commands/import-tallyup.js";
+import { runImportPlaywright } from "./commands/import-playwright.js";
 import { runRender } from "./commands/render.js";
 import { runCaptureCommand } from "./commands/capture.js";
 import { runInspectCommand } from "./commands/inspect.js";
@@ -58,6 +59,16 @@ importCmd
   .option("--json", "print a single JSON object instead of a summary")
   .action((workflowJson: string, opts: { output?: string; json?: boolean; force?: boolean }) => {
     process.exitCode = runImportTallyup(workflowJson, opts.output, Boolean(opts.json), Boolean(opts.force));
+  });
+
+importCmd
+  .command("playwright <testFileOrGlob>")
+  .description("convert Playwright test(s) into draft walkthrough YAML")
+  .option("-o, --out <dir>", "output directory (default: next to each input file)")
+  .option("--force", "overwrite existing drafts")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action((pattern: string, opts: { out?: string; json?: boolean; force?: boolean }) => {
+    process.exitCode = runImportPlaywright(pattern, opts.out, Boolean(opts.json), Boolean(opts.force));
   });
 
 program

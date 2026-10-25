@@ -37,3 +37,4 @@ export {
   type WalkthroughError,
 } from "./loader.js";
 export { convertTallyupWorkflow } from "./convert-tallyup.js";
+export { convertPlaywrightFile, type PlaywrightDraft } from "./convert-playwright.js";
