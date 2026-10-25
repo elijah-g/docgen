@@ -18,3 +18,6 @@ export * from "./pdf/index.js";
 export * from "./procedures/index.js";
 export * from "./chat/index.js";
 export * from "./mcp/index.js";
+export * from "./impact/index.js";
+export * from "./versions/index.js";
+export * from "./whats-new/index.js";

@@ -15,6 +15,9 @@ import { runQaCommand } from "./commands/qa.js";
 import { runBuild } from "./commands/build.js";
 import { runVoiceCommand } from "./commands/voice.js";
 import { runDigest } from "./commands/digest.js";
+import { runAffected } from "./commands/affected.js";
+import { runVersionFreeze, runVersionList } from "./commands/version.js";
+import { runWhatsNew } from "./commands/whats-new.js";
 import { runSkillsInstall } from "./commands/skills.js";
 import { runUsageAdd, runUsageReport } from "./commands/usage.js";
 import type { ModelTier } from "./usage/index.js";
@@ -234,6 +237,65 @@ program
   .option("--json", "print a single JSON object instead of a summary")
   .action((opts: { appRepo?: string; app?: string; area?: string; json?: boolean }) => {
     process.exitCode = runDigest({ appRepo: opts.appRepo ?? process.cwd(), area: opts.area, app: opts.app }, Boolean(opts.json));
+  });
+
+program
+  .command("affected")
+  .description("map a git diff to the walkthroughs it touches (routes, API calls, walkthrough files); unknown means all")
+  .requiredOption("--config <path>", "path to docgen.config.ts/.mjs")
+  .requiredOption("--base <ref>", "git ref to diff --head against")
+  .option("--head <ref>", "git ref to compare (default: HEAD); use --base <commit>^ --head <commit> for one past commit")
+  .option("--app-repo <path>", "app repo to diff (default: config.impact.appRepo, then cwd)")
+  .option("--app <path>", "app directory within a workspace monorepo (e.g. apps/web)")
+  .option("--include-working-tree", "also consider uncommitted changes")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action(
+    async (opts: { config: string; base: string; head?: string; appRepo?: string; app?: string; includeWorkingTree?: boolean; json?: boolean }) => {
+      process.exitCode = await runAffected(
+        { configPath: opts.config, appRepo: opts.appRepo, base: opts.base, head: opts.head, app: opts.app, includeWorkingTree: opts.includeWorkingTree },
+        Boolean(opts.json),
+      );
+    },
+  );
+
+const versionCmd = program.command("version").description("manage frozen docs versions (release tags)");
+
+versionCmd
+  .command("freeze <name>")
+  .description("snapshot the current build's search index, procedures and llms.txt into public/versions/<name>")
+  .requiredOption("--help-app <dir>", "the help app directory (holds public/)")
+  .option("--git-ref <ref>", "git ref this version corresponds to")
+  .option("--force", "overwrite an existing version")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action((name: string, opts: { helpApp: string; gitRef?: string; force?: boolean; json?: boolean }) => {
+    process.exitCode = runVersionFreeze(
+      { helpApp: opts.helpApp, name, gitRef: opts.gitRef, force: Boolean(opts.force) },
+      Boolean(opts.json),
+    );
+  });
+
+versionCmd
+  .command("list")
+  .description("list frozen docs versions")
+  .requiredOption("--help-app <dir>", "the help app directory (holds public/)")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action((opts: { helpApp: string; json?: boolean }) => {
+    process.exitCode = runVersionList({ helpApp: opts.helpApp }, Boolean(opts.json));
+  });
+
+program
+  .command("whats-new")
+  .description("build the What's new page from merged PRs since the last frozen version (or --since)")
+  .requiredOption("--config <path>", "path to docgen.config.ts/.mjs")
+  .option("--since <ref>", "git ref to start from")
+  .option("--from-github", "use gh pr list instead of git log")
+  .option("--app-repo <path>", "app repo to read history from (default: config.impact.appRepo, then the config's directory)")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action(async (opts: { config: string; since?: string; fromGithub?: boolean; appRepo?: string; json?: boolean }) => {
+    process.exitCode = await runWhatsNew(
+      { configPath: opts.config, since: opts.since, fromGithub: Boolean(opts.fromGithub), appRepo: opts.appRepo },
+      Boolean(opts.json),
+    );
   });
 
 program

@@ -110,6 +110,35 @@ export interface PublishConfig {
 }
 
 /**
+ * `docgen affected` settings (docs/scope.md "Only rebuild what changed" -> "Impact map";
+ * build-plan.md M17). `ignore`/`all` extend (never replace) the built-in glob lists in
+ * src/impact/glob.ts.
+ */
+export interface ImpactConfig {
+  /**
+   * Path to the app repo whose git diff maps to walkthroughs, relative to the config file (or
+   * absolute). Unset: the `--app-repo` CLI flag is required instead.
+   */
+  appRepo?: string;
+  /** Explicit app directory within a workspace monorepo (relative to `appRepo`, or absolute) —
+   * same as `digest`'s `--app`/`app` option. */
+  app?: string;
+  /** Extra glob patterns always treated as irrelevant to every walkthrough (docs/tests/etc. are
+   * built in; this adds more without disabling the defaults). */
+  ignore?: string[];
+  /** Extra glob patterns that force "every walkthrough is affected" when matched (lockfiles,
+   * the root layout, the auth gate, and db migrations are built in; this adds more). */
+  all?: string[];
+  /**
+   * Fraction of routes (0-1) a changed file must be imported by (via the static import graph)
+   * before it's treated as affecting every walkthrough, rather than just the routes that import
+   * it. Default 0.6 (60%) — a file imported by more than that share of routes is "shared enough"
+   * that per-route precision isn't worth trusting.
+   */
+  allThreshold?: number;
+}
+
+/**
  * Help chat settings (docs/scope.md "Help chat"; "Token efficiency": "help chat answers from
  * retrieved pages" = fast tier; decisions.md #40 "owner's key when self-hosting"). The owner's
  * `ANTHROPIC_API_KEY` env var is the only key source — never put a key in this file.
@@ -214,6 +243,8 @@ export interface DocgenConfig {
   publish?: PublishConfig;
   /** Help chat settings; see `ChatConfig`. */
   chat?: ChatConfig;
+  /** `docgen affected` settings; see `ImpactConfig`. */
+  impact?: ImpactConfig;
 }
 
 /** Settings for the `pdf` build stage / `docgen pdf` command (src/pdf/**). */
@@ -238,6 +269,8 @@ export interface ResolvedConfig extends Omit<DocgenConfig, "signIn" | "database"
    * concrete settings should go through `resolveCaptureSettings()` below.
    */
   capture?: CaptureSettings;
+  /** `impact.appRepo`/`impact.app`, when set, resolved to absolute paths by `loadConfig()`. */
+  impact?: ImpactConfig;
 }
 
 /** Fills in defaults for any settings `config.capture` left unset — use at capture call sites

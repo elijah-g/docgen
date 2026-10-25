@@ -99,6 +99,12 @@ async function resolveConfig(config: DocgenConfig, configDir: string): Promise<R
     buildDir: absolute(configDir, config.buildDir ?? ".build"),
     helpApp: config.helpApp ? absolute(configDir, config.helpApp) : undefined,
     capture: resolveCaptureSettings(config.capture),
+    impact: config.impact
+      ? {
+          ...config.impact,
+          appRepo: config.impact.appRepo ? absolute(configDir, config.impact.appRepo) : undefined,
+        }
+      : undefined,
     signIn,
     database,
   };

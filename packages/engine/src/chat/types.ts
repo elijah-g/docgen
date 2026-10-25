@@ -7,7 +7,7 @@ export interface ChatHistoryTurn {
   content: string;
 }
 
-/** The request body the chat route accepts: `POST {question, currentPath?, history?}`. */
+/** The request body the chat route accepts: `POST {question, currentPath?, history?, version?}`. */
 export interface ChatRequest {
   question: string;
   /** The in-app widget's current page path (e.g. "/competitors") — boosts docs whose
@@ -15,6 +15,12 @@ export interface ChatRequest {
    * knows which screen the user is on"). */
   currentPath?: string;
   history?: ChatHistoryTurn[];
+  /** Which frozen docs version to answer from (build-plan.md M21 step 3) — a name from
+   * `versions.json`, `"latest"`, or omitted, all meaning "the current build". Resolved by the
+   * route (versions/load.ts `resolveVersionSource`) before `handleChatRequest` is even called —
+   * this field is carried on the request type only so the route can read/validate it from the
+   * same parsed body it already has. */
+  version?: string;
 }
 
 /** One citation shown alongside the answer: `[n]` -> page URL (+ heading anchor). */
