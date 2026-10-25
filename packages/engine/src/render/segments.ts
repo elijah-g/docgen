@@ -196,6 +196,10 @@ export interface SceneRenderReport {
   scenesRendered: number;
   scenesReused: number;
   wallTimeMs: number;
+  /** Total frames across all rendered scenes whose `frameSignature` matched the previous
+   * frame's and so were repeated instead of screenshotted (M16 part 2). 0 when every scene was
+   * reused from cache (nothing re-rendered this run). */
+  framesSkipped: number;
 }
 
 /**
@@ -242,6 +246,7 @@ export async function renderScenesToSegments(opts: {
   }
 
   const started = Date.now();
+  let framesSkipped = 0;
   if (toRender.length > 0) {
     const concurrency = Math.max(1, Math.min(opts.concurrency ?? defaultConcurrency(), toRender.length));
     const { pages, close } = await openRenderBrowser(bundleDir, quality.deviceScaleFactor, concurrency);
@@ -250,7 +255,8 @@ export async function renderScenesToSegments(opts: {
       const worker = async (page: import("playwright").Page) => {
         while (next < toRender.length) {
           const target = toRender[next++];
-          await renderFrameRange(page, target.range, quality, ffmpeg, target.file);
+          const result = await renderFrameRange(page, target.range, quality, ffmpeg, target.file, timeline);
+          framesSkipped += result.framesSkipped ?? 0;
         }
       };
       // Wait for every worker to settle (not just the first to reject) before closing the
@@ -266,6 +272,14 @@ export async function renderScenesToSegments(opts: {
     }
   }
   const wallTimeMs = Date.now() - started;
+  if (process.env.DOCGEN_PROFILE === "1") {
+    const totalFrames = ranges.length > 0 ? ranges[ranges.length - 1].end : 0;
+    console.error(
+      `[docgen render profile] scenes ${targets.length - toRender.length}/${targets.length} reused, ` +
+        `${toRender.length} rendered, ${framesSkipped}/${totalFrames} frames skipped (signature match), ` +
+        `${wallTimeMs.toFixed(0)}ms`,
+    );
+  }
 
   // Prune segments for these scene ids whose hash no longer matches — keeps old quality
   // variants in their own directory untouched (segmentsDir is already draft- or full-specific).
@@ -298,6 +312,7 @@ export async function renderScenesToSegments(opts: {
       scenesRendered: toRender.length,
       scenesReused: targets.length - toRender.length,
       wallTimeMs,
+      framesSkipped,
     },
   };
 }

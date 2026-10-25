@@ -4,6 +4,7 @@ import { execFile, spawn } from "node:child_process";
 import { mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { frameSignature } from "./state.js";
 import type { RenderQuality, Timeline } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -77,6 +78,43 @@ export interface RenderFramesResult {
   silentVideo: string;
   frames: number;
   wallTimeMs: number;
+  /** Frames whose `frameSignature` matched the previous rendered frame's and so were repeated
+   * from its screenshot bytes instead of paying another Chromium `page.evaluate`/`screenshot`
+   * round trip (M16 part 2 — most of a walkthrough is a static screenshot held while narration
+   * plays). Absent/0 when no `Timeline` was passed in (signature detection off). */
+  framesSkipped?: number;
+}
+
+/** Steps `page` through `[start, end)` at `quality.fps`, writing one JPEG buffer per frame to
+ * `onFrame`. When `timeline` is given, a frame whose `frameSignature` (state.ts) matches the
+ * previous frame's is never screenshotted — the previous frame's buffer is reused instead, since
+ * an identical signature means `renderAt` would have produced pixel-identical output anyway. */
+async function stepFrames(
+  page: import("playwright").Page,
+  start: number,
+  end: number,
+  quality: RenderQuality,
+  timeline: Timeline | undefined,
+  onFrame: (buf: Buffer) => void | Promise<void>,
+): Promise<{ framesSkipped: number }> {
+  let lastSig: string | null = null;
+  let lastBuf: Buffer | null = null;
+  let framesSkipped = 0;
+  for (let i = start; i < end; i++) {
+    const t = i / quality.fps;
+    const sig = timeline ? frameSignature(timeline, t) : null;
+    if (sig !== null && sig === lastSig) {
+      framesSkipped++;
+      await onFrame(lastBuf!);
+      continue;
+    }
+    await page.evaluate((t) => (window as any).renderAt(t), t);
+    const buf = await page.screenshot({ type: "jpeg", quality: quality.screenshotQuality ?? 95 });
+    lastSig = sig;
+    lastBuf = buf;
+    await onFrame(buf);
+  }
+  return { framesSkipped };
 }
 
 function spawnFrameEncoder(ffmpeg: string, quality: RenderQuality, frameCount: number, outFile: string) {
@@ -168,15 +206,15 @@ export async function renderFrames(
   });
 
   const started = Date.now();
+  let framesSkipped = 0;
   try {
     await withPage(
       bundleDir,
       async (page) => {
-        for (let i = 0; i < frames; i++) {
-          await page.evaluate((t) => (window as any).renderAt(t), i / quality.fps);
-          const buf = await page.screenshot({ type: "jpeg", quality: quality.screenshotQuality ?? 95 });
+        const result = await stepFrames(page, 0, frames, quality, timeline, async (buf) => {
           if (!ff.stdin!.write(buf)) await new Promise((r) => ff.stdin!.once("drain", r));
-        }
+        });
+        framesSkipped = result.framesSkipped;
         ff.stdin!.end();
       },
       quality.deviceScaleFactor,
@@ -188,7 +226,7 @@ export async function renderFrames(
   }
   await rename(tmpFile, silent);
 
-  return { silentVideo: silent, frames, wallTimeMs: Date.now() - started };
+  return { silentVideo: silent, frames, wallTimeMs: Date.now() - started, framesSkipped };
 }
 
 export interface FrameRange {
@@ -209,6 +247,7 @@ export async function renderFrameRange(
   quality: RenderQuality,
   ffmpeg: string,
   outFile: string,
+  timeline?: Timeline,
 ): Promise<RenderFramesResult> {
   const frames = range.end - range.start;
   // Write under a pid+random tmp name and rename into place only once ffmpeg exits clean —
@@ -223,12 +262,12 @@ export async function renderFrameRange(
   });
 
   const started = Date.now();
+  let framesSkipped = 0;
   try {
-    for (let i = range.start; i < range.end; i++) {
-      await page.evaluate((t) => (window as any).renderAt(t), i / quality.fps);
-      const buf = await page.screenshot({ type: "jpeg", quality: quality.screenshotQuality ?? 95 });
+    const result = await stepFrames(page, range.start, range.end, quality, timeline, async (buf) => {
       if (!ff.stdin!.write(buf)) await new Promise((r) => ff.stdin!.once("drain", r));
-    }
+    });
+    framesSkipped = result.framesSkipped;
     ff.stdin!.end();
     await ffDone;
   } catch (err) {
@@ -240,7 +279,7 @@ export async function renderFrameRange(
   }
   await rename(tmpFile, outFile);
 
-  return { silentVideo: outFile, frames, wallTimeMs: Date.now() - started };
+  return { silentVideo: outFile, frames, wallTimeMs: Date.now() - started, framesSkipped };
 }
 
 /** Leftover `.tmp-*.mp4` files from a previous crashed/interrupted render — never valid

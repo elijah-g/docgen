@@ -27,6 +27,7 @@ function lastAtOrBefore<T>(list: T[], t: number, key: (item: T) => number): numb
 const clamp = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, p: number): number => a + (b - a) * p;
 const ease = (p: number): number => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const easeOut = (p: number): number => 1 - Math.pow(1 - p, 3);
 const ramp = (t: number, t0: number, d: number): number => clamp((t - t0) / d, 0, 1);
 
 /** The frame cue on screen at `t` — mirrors player.js's `lastAtOrBefore(TL.frames, t)` fallback
@@ -84,6 +85,90 @@ export interface SceneEntryState {
   highlight: { t0: number; t1: number; box: TimelineHighlight["box"] } | null;
   caption: string | null;
   chip: string | null;
+}
+
+/**
+ * A full visual signature of frame `t` — every value `renderAt(t)` (assets/player/player.js)
+ * computes to set DOM style/content, flattened and stringified. Two frames with an identical
+ * signature are pixel-identical: `renderAt` reads nothing else, so there is nothing left that
+ * could differ on screen. video.ts's `renderFrameRange` uses this (M16 part 2) to skip the
+ * Chromium `page.evaluate`/`screenshot` round trip for a frame whose signature matches the
+ * previous rendered frame's and just repeat that frame's screenshot bytes — most of a
+ * walkthrough is a still screenshot with a caption while narration plays; motion (cursor moves,
+ * highlights animating in, camera/transitions) is confined to short windows this signature makes
+ * exact.
+ *
+ * Must be kept in sync with player.js's `renderAt` by hand (same pattern as this file's header
+ * note for the rest of its exports) — every `ramp()`/`ease()` term player.js feeds into a style
+ * or text value has a matching term here, in the same order player.js computes it, so that
+ * outside any active animation window (where `ramp` has saturated to its clamped 0/1 endpoint)
+ * two different `t` values produce byte-identical JSON.
+ */
+export function frameSignature(tl: Timeline, t: number): string {
+  const parts: Array<number | string> = [];
+  const push = (...vals: Array<number | string>) => {
+    parts.push(...vals);
+  };
+  const revealP = (start: number, dur = 0.7): number => easeOut(ramp(t, start, dur));
+
+  // Stage envelope (intro card -> stage -> outro card).
+  const sIn = ease(ramp(t, tl.stageIn.t0, tl.stageIn.t1 - tl.stageIn.t0));
+  const sOut = ease(ramp(t, tl.stageOut.t0, tl.stageOut.t1 - tl.stageOut.t0));
+  const stageVis = sIn * (1 - sOut);
+  push(stageVis, sIn, sOut);
+
+  // Intro card.
+  const iOut = ease(ramp(t, tl.stageIn.t0 - 0.45, 0.5));
+  push(iOut, revealP(0.15), revealP(0.45), revealP(0.65, 0.8), revealP(1.15), revealP(1.6));
+
+  // Outro card.
+  const oIn = ease(ramp(t, tl.stageOut.t0 + 0.25, 0.7));
+  const o0 = tl.stageOut.t0 + 0.35;
+  const recapLen = tl.outro.recap.length;
+  push(oIn, revealP(o0, 0.7));
+  for (let i = 0; i < recapLen; i++) push(revealP(o0 + 0.5 + i * 0.35, 0.6));
+  push(revealP(o0 + 0.6 + recapLen * 0.35, 0.7));
+
+  if (stageVis > 0.001) {
+    const fi = Math.max(0, lastAtOrBefore(tl.frames, t, (f) => f.t));
+    const cur = tl.frames[fi];
+    const prev = tl.frames[Math.max(0, fi - 1)];
+    const fadeP = cur.transition === "fade" ? ramp(t, cur.t, tl.fade) : 1;
+    push(prev.src, cur.src, fadeP);
+
+    const VW = tl.viewport.w;
+    const VH = tl.viewport.h;
+    const c = cameraAt(tl, t);
+    const z = c.z;
+    const cx = clamp(c.cx, VW / 2 / z, VW - VW / 2 / z);
+    const cy = clamp(c.cy, VH / 2 / z, VH - VH / 2 / z);
+    push(z, cx, cy);
+
+    const hi = highlightAt(tl, t);
+    if (hi) {
+      const a = Math.min(easeOut(ramp(t, hi.t0, 0.3)), 1 - ramp(t, hi.t1 - 0.25, 0.25));
+      push(hi.box.x, hi.box.y, hi.box.w, hi.box.h, a);
+    } else push("none");
+
+    const p = cursorAt(tl, t);
+    const press = tl.clicks.some((k) => t >= k.t && t <= k.t + 0.16) ? 0.86 : 1;
+    const cVis = ramp(t, tl.stageIn.t1 - 0.2, 0.4);
+    push(p.x, p.y, press, cVis);
+
+    for (const k of tl.clicks) {
+      const q = (t - k.t) / 0.55;
+      if (q < 0 || q > 1) push("h");
+      else push(k.x, k.y, easeOut(q), 1 - q);
+    }
+  }
+
+  const cap = captionAt(tl, t);
+  push(cap ? cap.text : "", cap ? Math.min(ramp(t, cap.t0, 0.2), 1 - ramp(t, cap.t1 - 0.2, 0.2)) : 0);
+
+  const chip = chipAt(tl, t);
+  push(chip ? chip.num : "", chip ? chip.eyebrow : "", chip ? chip.title : "", chip ? easeOut(ramp(t, chip.t0, 0.35)) : 0);
+
+  return JSON.stringify(parts);
 }
 
 export function stateAt(tl: Timeline, t: number): SceneEntryState {

@@ -72,6 +72,13 @@
   }
 
   // ------------------------------------------------------------ render
+  // packages/engine/src/render/state.ts's frameSignature() is a hand-kept Node-side port of every
+  // value this function computes (no DOM, so it can run per-candidate-frame without a browser) —
+  // video.ts's renderFrameRange uses it to skip re-rendering a frame whose signature matches the
+  // previous one. Any change here that changes what's visible (a new ramp/ease term, a new
+  // branch, a new style/content assignment) must be mirrored there, or a frame that actually
+  // changed could get a false signature match and come out as a repeated/frozen frame with no
+  // test catching it.
   async function renderAt(t) {
     const waits = []
 
