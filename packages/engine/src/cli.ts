@@ -16,6 +16,7 @@ import { runBuild } from "./commands/build.js";
 import { runVoiceCommand } from "./commands/voice.js";
 import { runDigest } from "./commands/digest.js";
 import { runAffected } from "./commands/affected.js";
+import { runCiCli } from "./commands/ci.js";
 import { runVersionFreeze, runVersionList } from "./commands/version.js";
 import { runWhatsNew } from "./commands/whats-new.js";
 import { runSkillsInstall } from "./commands/skills.js";
@@ -373,10 +374,69 @@ program
   .description("scaffold the help app template into <dir>/help, detecting the app's framework, routes and brand")
   .option("--app-repo <path>", "app repo to detect framework/routes/brand from (default: <dir>)")
   .option("--app <path>", "app directory within a workspace monorepo (e.g. apps/web) — required when several Next.js apps are found")
+  .option("--ci", "also write .github/workflows/docgen.yml (PR check with screenshot diffs)")
+  .option("--ci-start-command <cmd>", "command that starts the app in CI (default: npm run dev)")
+  .option("--ci-uses <ownerRepoAtRef>", "the docgen action to use (default: elijah-g/docgen@main)")
   .option("--json", "print a single JSON object instead of a summary")
-  .action((dir: string | undefined, opts: { appRepo?: string; app?: string; json?: boolean }) => {
-    process.exitCode = runInit({ dir, appRepo: opts.appRepo, app: opts.app }, Boolean(opts.json));
-  });
+  .action(
+    (
+      dir: string | undefined,
+      opts: { appRepo?: string; app?: string; ci?: boolean; ciStartCommand?: string; ciUses?: string; json?: boolean },
+    ) => {
+      process.exitCode = runInit(
+        { dir, appRepo: opts.appRepo, app: opts.app, ci: opts.ci, ciStartCommand: opts.ciStartCommand, ciUses: opts.ciUses },
+        Boolean(opts.json),
+      );
+    },
+  );
+
+program
+  .command("ci")
+  .description("PR check: affected walkthroughs, capture, screenshot diff, one PR comment (no model, no API keys)")
+  .requiredOption("--config <path>", "path to docgen.config.ts/.mjs")
+  .requiredOption("--base <ref>", "git ref to diff --head against")
+  .option("--head <ref>", "git ref to compare (default: HEAD)")
+  .option("--pr <number>", "pull request number, for the PR comment")
+  .option("--app-url <url>", "override config.app.baseUrl for this run")
+  .option("--app-repo <path>", "app repo to diff (default: config.impact.appRepo, then cwd)")
+  .option("--baseline <source>", "where before-screenshots come from: disk (help app, default) or git (at --base)")
+  .option("--fork-pr", "PR comes from a fork (read-only token): skip push and comment, write an artifact")
+  .option("--dry-run", "write the comment and images to a local dir instead of GitHub")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action(
+    async (opts: {
+      config: string;
+      base: string;
+      head?: string;
+      pr?: string;
+      appUrl?: string;
+      appRepo?: string;
+      baseline?: string;
+      forkPr?: boolean;
+      dryRun?: boolean;
+      json?: boolean;
+    }) => {
+      if (opts.baseline && opts.baseline !== "disk" && opts.baseline !== "git") {
+        console.error(`--baseline must be "disk" or "git", got "${opts.baseline}"`);
+        process.exitCode = 2;
+        return;
+      }
+      process.exitCode = await runCiCli(
+        {
+          configPath: opts.config,
+          base: opts.base,
+          head: opts.head,
+          prNumber: opts.pr ? Number(opts.pr) : undefined,
+          appUrl: opts.appUrl,
+          appRepo: opts.appRepo,
+          baseline: opts.baseline as "disk" | "git" | undefined,
+          forkPr: Boolean(opts.forkPr),
+          dryRun: Boolean(opts.dryRun),
+        },
+        Boolean(opts.json),
+      );
+    },
+  );
 
 program
   .command("edit <action> [args...]")

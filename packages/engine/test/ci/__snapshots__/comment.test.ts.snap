@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ci/comment buildCommentMarkdown > matches the expected markdown shape 1`] = `
+"<!-- docgen-ci-comment -->
+## docgen CI
+4 walkthrough(s) affected · 1 changed · 1 broken · 1 new · 1 unchanged
+
+### \`broken-one\` — broken
+
+> step "submit": locator not found
+
+Run locally in Claude Code:
+\`\`\`
+claude -p "load the docgen-repair skill and fix 'broken-one'"
+\`\`\`
+
+### \`add-entry\` — changed
+
+| step | before | after | diff | change |
+| --- | --- | --- | --- | --- |
+| step-01.png | ![before](https://raw.githubusercontent.com/acme/app/add-entry/before-step-01.png) | ![after](https://raw.githubusercontent.com/acme/app/add-entry/after-step-01.png) | ![diff](https://raw.githubusercontent.com/acme/app/add-entry/diff-step-01.png) | 4.2% |
+
+### \`new-one\` — new walkthrough — no baseline yet
+
+**Stale pages** (published, source walkthrough no longer exists): \`deleted-flow\`
+
+---
+_base \`abc1234abc12\` → head \`def5678def56\` · PR #42 · updated on every push, no model used._"
+`;

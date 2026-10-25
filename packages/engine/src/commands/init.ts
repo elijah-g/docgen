@@ -2,11 +2,12 @@
 // engineer" step 1. Copies the help-app template into `<dir>/help`, detects
 // the target app's framework/routes (comments only) and brand, and writes
 // `docgen.config.ts`. Never overwrites a file that's already there.
-import { resolve } from "node:path";
+import { resolve, relative } from "node:path";
 import { detectFramework } from "../init/detect.js";
 import { extractBrand } from "../init/brand.js";
 import { copyTemplate } from "../init/copy-template.js";
 import { writeDocgenConfig } from "../init/write-config.js";
+import { writeCiWorkflow } from "../init/ci.js";
 import type { BrandConfig } from "../config/types.js";
 
 export interface InitOptions {
@@ -19,6 +20,12 @@ export interface InitOptions {
   app?: string;
   /** Default app URL written into docgen.config.ts when nothing better is known. */
   appUrl?: string;
+  /** Also writes `.github/workflows/docgen.yml` (build-plan.md M18). */
+  ci?: boolean;
+  /** `--ci`'s app-start command. Default "npm run dev". */
+  ciStartCommand?: string;
+  /** `--ci`'s `uses:` line for the docgen action. Default "elijah-g/docgen@main" (decisions #25). */
+  ciUses?: string;
 }
 
 export interface InitResult {
@@ -30,6 +37,7 @@ export interface InitResult {
   copied: number;
   skipped: string[];
   config: { file: string; written: boolean };
+  ci?: { file: string; written: boolean };
 }
 
 export function runInitCommand(options: InitOptions): InitResult {
@@ -51,6 +59,16 @@ export function runInitCommand(options: InitOptions): InitResult {
     detected,
   });
 
+  let ci: { file: string; written: boolean } | undefined;
+  if (options.ci) {
+    ci = writeCiWorkflow({
+      appRepo: appRepoDir,
+      configPath: `${relative(appRepoDir, destDir)}/docgen.config.ts`,
+      startCommand: options.ciStartCommand,
+      uses: options.ciUses,
+    });
+  }
+
   return {
     destDir,
     appRepoDir,
@@ -60,6 +78,7 @@ export function runInitCommand(options: InitOptions): InitResult {
     copied: copied.length,
     skipped,
     config,
+    ci,
   };
 }
 
@@ -94,5 +113,8 @@ export function runInit(options: InitOptions, json: boolean): number {
     console.log(`  skipped (already present): ${result.skipped.join(", ")}`);
   }
   console.log(result.config.written ? `  wrote ${result.config.file}` : `  left existing ${result.config.file} untouched`);
+  if (result.ci) {
+    console.log(result.ci.written ? `  wrote ${result.ci.file}` : `  left existing ${result.ci.file} untouched`);
+  }
   return 0;
 }
