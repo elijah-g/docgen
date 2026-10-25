@@ -286,6 +286,72 @@
               "hold": {
                 "type": "number"
               },
+              "callouts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "$ref": "#/definitions/Walkthrough/properties/steps/items/properties/camera/anyOf/1/properties/focus"
+                    },
+                    "box": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        },
+                        "w": {
+                          "type": "number"
+                        },
+                        "h": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "w",
+                        "h"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "blur": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "$ref": "#/definitions/Walkthrough/properties/steps/items/properties/camera/anyOf/1/properties/focus"
+                    },
+                    "box": {
+                      "$ref": "#/definitions/Walkthrough/properties/steps/items/properties/callouts/items/properties/box"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              },
               "actions": {
                 "type": "array",
                 "items": {

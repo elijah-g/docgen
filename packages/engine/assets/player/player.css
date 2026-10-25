@@ -39,6 +39,20 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-feature-
 #cursor { position: absolute; left: 0; top: 0; width: 30px; height: 30px; transform-origin: 0 0; pointer-events: none;
   filter: drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
 
+/* ---------------- callouts + blur (M22) */
+#blurLayer, #calloutLayer { position: absolute; left: 0; top: 0; width: 1440px; height: 810px; pointer-events: none; }
+/* A mosaic'd (irreversible — see player.js's BLUR_MOSAIC_* / pages/annotate.ts's MOSAIC_*)
+   canvas per blur box; the blur() here only softens the box's own edges against the
+   surrounding frame, same as annotate.ts's canvas. */
+.blur-box { position: absolute; border-radius: 3px; filter: blur(2px); }
+.callout-badge { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: #dc2626; color: #fff; font: 700 13px/26px -apple-system, Helvetica, Arial, sans-serif; text-align: center;
+  box-shadow: 0 1px 4px rgb(0 0 0 / .5); }
+#calloutLegend { position: absolute; left: 24px; bottom: 24px; max-width: 70%; background: hsl(222 47% 8% / .88);
+  color: #fff; border-radius: 10px; padding: 8px 14px; font: 500 15px/1.6 -apple-system, Helvetica, Arial, sans-serif; }
+#calloutLegend:empty { display: none; }
+#calloutLegend b { color: #f87171; margin-right: 4px; }
+
 /* ---------------- caption band */
 #band { position: absolute; left: 132px; right: 132px; top: 972px; height: 96px; display: flex; align-items: center; gap: 28px; }
 #chip { flex: none; width: 360px; display: flex; align-items: center; gap: 14px; }

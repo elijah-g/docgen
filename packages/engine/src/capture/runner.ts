@@ -24,6 +24,7 @@ import type {
   FailureReport,
   ManifestStep,
   ProblemEntry,
+  ResolvedBox,
   StepResult,
   ValidationResult,
 } from "./types.js";
@@ -58,6 +59,28 @@ export interface RunInfo {
 }
 
 const noop = (): void => {};
+
+/** Resolves a step's `callouts`/`blur` entries to boxes for the capture manifest (M22):
+ * `target`-pinned entries are located against the live page right now (so the box reflects
+ * wherever the element actually rendered this run); a fixed `box` entry is passed through
+ * unchanged. An entry whose target can't be found this run is simply dropped — pages/render
+ * then skip it rather than drawing a stale/wrong box. */
+async function resolveOverlayBoxes(
+  page: Page,
+  items: Array<{ id: string; target?: Target; box?: import("./types.js").Box }> | undefined,
+): Promise<ResolvedBox[]> {
+  if (!items || items.length === 0) return [];
+  const out: ResolvedBox[] = [];
+  for (const item of items) {
+    if (item.target) {
+      const box = await boxOf(item.target, page).catch(() => null);
+      if (box) out.push({ id: item.id, box });
+    } else if (item.box) {
+      out.push({ id: item.id, box: item.box });
+    }
+  }
+  return out;
+}
 
 /** Runs one walkthrough end to end: sign in, replay every step, validate. */
 export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult> {
@@ -229,6 +252,8 @@ export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult
       log(`step ${si + 1}/${walkthrough.steps.length}: ${step.id ?? step.title ?? si}`);
       let snapshotForDoc: string | null = null;
       let failedAction: Action | undefined;
+      let calloutBoxes: ResolvedBox[] = [];
+      let blurBoxes: ResolvedBox[] = [];
 
       try {
         const acts = step.actions;
@@ -237,6 +262,11 @@ export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult
           failedAction = a;
           ai = await runAction({ page, step, a, acts, ai, events, shot, stepResult, baseOrigin, maxTypeMs });
         }
+        // Resolve callout/blur target boxes against the page in the state it's in right after
+        // this step's actions ran — the same moment the step's doc screenshot is taken from, so
+        // a pinned box matches what that screenshot (and the video frame built from it) shows.
+        calloutBoxes = await resolveOverlayBoxes(page, step.callouts);
+        blurBoxes = await resolveOverlayBoxes(page, step.blur);
         if (step.camera && step.camera !== "full" && step.camera.focus) {
           const b = await boxOf(step.camera.focus, page).catch(() => null);
           if (b) {
@@ -272,7 +302,7 @@ export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult
         camera: step.camera ?? "full",
         cameraBox: events.cameraBox ?? null,
         events: events.filter(Boolean),
-        doc: { image: snapshotForDoc, highlights },
+        doc: { image: snapshotForDoc, highlights, callouts: calloutBoxes, blur: blurBoxes },
         impact: impact.take(),
         checks: stepResult.checks,
       });

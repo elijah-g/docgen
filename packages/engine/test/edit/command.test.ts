@@ -185,3 +185,55 @@ describe("runEditCommand setData", () => {
     expect(payload.invalid).toBe(true);
   });
 });
+
+describe("runEditCommand addCallout/addBlur (CLI parity for the Studio's callout/blur actions)", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it("addCallout via CLI JSON args round-trips through the walkthrough file", () => {
+    const { walkthroughFile } = setupHelpApp();
+    const code = runEditCommand(
+      "addCallout",
+      [walkthroughFile, "check-show", JSON.stringify({ id: "c1", box: { x: 1, y: 2, w: 3, h: 4 }, label: "Here" })],
+      { by: "agent", json: true },
+    );
+    expect(code).toBe(0);
+    const wt = loadWalkthroughFile(walkthroughFile);
+    expect(wt.steps.find((s) => s.id === "check-show")!.callouts).toEqual([
+      { id: "c1", box: { x: 1, y: 2, w: 3, h: 4 }, label: "Here" },
+    ]);
+  });
+
+  it("addBlur, then removeBlur via CLI", () => {
+    const { walkthroughFile } = setupHelpApp();
+    runEditCommand("addBlur", [walkthroughFile, "check-show", JSON.stringify({ id: "b1", box: { x: 0, y: 0, w: 5, h: 5 } })], {
+      by: "agent",
+      json: true,
+    });
+    let wt = loadWalkthroughFile(walkthroughFile);
+    expect(wt.steps.find((s) => s.id === "check-show")!.blur).toHaveLength(1);
+
+    const code = runEditCommand("removeBlur", [walkthroughFile, "check-show", "b1"], { by: "agent", json: true });
+    expect(code).toBe(0);
+    wt = loadWalkthroughFile(walkthroughFile);
+    expect(wt.steps.find((s) => s.id === "check-show")!.blur ?? []).toHaveLength(0);
+  });
+
+  it("fails cleanly (exit 1) on malformed callout JSON", () => {
+    const { walkthroughFile } = setupHelpApp();
+    const code = runEditCommand("addCallout", [walkthroughFile, "check-show", "{not json"], { by: "agent", json: true });
+    expect(code).toBe(1);
+    const payload = JSON.parse(logSpy.mock.calls[0][0] as string);
+    expect(payload.ok).toBe(false);
+  });
+});

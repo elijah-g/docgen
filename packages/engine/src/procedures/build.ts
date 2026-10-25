@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 import type { Walkthrough } from "../walkthrough/index.js";
 import type { CaptureManifest, ValidationResult } from "../capture/index.js";
 import { stripMarkdown } from "../index-search/index.js";
+import { screenshotFile } from "../pages/content.js";
 import type { BuildProceduresResult, Procedure, ProcedureStep } from "./types.js";
 
 function readJsonIfExists<T>(file: string): T | undefined {
@@ -43,12 +44,16 @@ function instructionFor(step: Walkthrough["steps"][number]): string {
  * pages stage already computed — see pages/build.ts `BuildPageResult.passed`). Screenshots are
  * copied to `<publicDir>/screenshots/<id>/step-NN.png` so `get_procedure`'s `screenshot` URL is
  * a real static file any MCP/chat client can fetch directly, independent of how the site's own
- * MDX pages resolve their relative image links.
+ * MDX pages resolve their relative image links. The *source* copied is always the page's own
+ * already-annotated screenshot (`<pagesDir>/<id>/screenshots/step-NN.png`, written by
+ * pages/build.ts's `annotateFrame` with any `blur:`/`callouts:` already burned in) — never the
+ * raw `captureDir/frames/*` file, which could still show what a step's `blur:` was meant to hide
+ * (M22 review finding: procedures.json's screenshot copy bypassed annotateFrame entirely).
  */
 export function buildProcedure(
   wf: Walkthrough,
   captureDir: string,
-  opts: { videoDir?: string; publicDir?: string; lastChecked?: string },
+  opts: { pagesDir?: string; videoDir?: string; publicDir?: string; lastChecked?: string },
 ): Procedure | undefined {
   const manifest = readJsonIfExists<CaptureManifest>(join(captureDir, "manifest.json"));
   const validation = readJsonIfExists<ValidationResult>(join(captureDir, "validation.json"));
@@ -67,8 +72,8 @@ export function buildProcedure(
 
     const n = i + 1;
     let screenshot: string | undefined;
-    if (mStep.doc.image && opts.publicDir) {
-      const src = join(captureDir, "frames", mStep.doc.image);
+    if (mStep.doc.image && opts.publicDir && opts.pagesDir) {
+      const src = join(opts.pagesDir, id, screenshotFile(n));
       if (existsSync(src)) {
         const destRel = join("screenshots", id, `step-${String(n).padStart(2, "0")}.png`);
         const dest = join(opts.publicDir, destRel);
@@ -114,6 +119,9 @@ export function buildProcedure(
 export interface BuildProceduresOptions {
   /** Each publishable walkthrough this run built, with its own capture dir. */
   sources: { wf: Walkthrough; captureDir: string; lastChecked?: string }[];
+  /** `<outDir>/pages` — where pages/build.ts wrote each walkthrough's already-annotated
+   * screenshots; `buildProcedure` copies from here, never from `captureDir/frames`. */
+  pagesDir?: string;
   /** `<outDir>/videos` (or help app's video dir) — optional, for `videoTimeSec`. */
   videoDir?: string;
   /** Where to write `procedures.json` and copy screenshots into `screenshots/<id>/`. */
@@ -152,6 +160,7 @@ export function buildProcedures(opts: BuildProceduresOptions): BuildProceduresRe
   const procedures: Procedure[] = [];
   for (const source of opts.sources) {
     const procedure = buildProcedure(source.wf, source.captureDir, {
+      pagesDir: opts.pagesDir,
       videoDir: opts.videoDir,
       publicDir: opts.publicDir,
       lastChecked: source.lastChecked,

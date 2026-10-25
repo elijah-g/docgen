@@ -3,7 +3,16 @@
 // per step; `hold` (on a step, or a `hold` capture event) is respected.
 import type { Walkthrough, Step } from "../walkthrough/types.js";
 import type { CaptureManifest } from "../capture/index.js";
-import type { CameraFrame, NarrationBeat, Point, Timeline, TimelineHighlight, TimelineScene } from "./types.js";
+import type {
+  CameraFrame,
+  NarrationBeat,
+  Point,
+  Timeline,
+  TimelineBlurWindow,
+  TimelineCalloutWindow,
+  TimelineHighlight,
+  TimelineScene,
+} from "./types.js";
 
 const T = {
   fade: 0.35,
@@ -76,6 +85,8 @@ export function buildTimeline(
     moves: [],
     clicks: [],
     highlights: [],
+    callouts: [],
+    blur: [],
     cameras: [],
     captions: [],
     chips: [],
@@ -87,9 +98,11 @@ export function buildTimeline(
     previewAudio: "narration.m4a",
     scenes: [],
   };
-  // Non-optional local alias: `Timeline.scenes` is optional only so hand-built fixtures outside
-  // this module stay valid; `tl` above always sets it, so every push through `scenes` is safe.
+  // Non-optional local aliases: these `Timeline` fields are optional only so hand-built fixtures
+  // outside this module stay valid; `tl` above always sets them, so every push through them is safe.
   const scenes: TimelineScene[] = tl.scenes!;
+  const calloutWindows: TimelineCalloutWindow[] = tl.callouts!;
+  const blurWindows: TimelineBlurWindow[] = tl.blur!;
 
   let t = 0;
 
@@ -228,6 +241,33 @@ export function buildTimeline(
     closeHi(t - 0.15);
     tl.chips[tl.chips.length - 1].t1 = t;
     scenes.push({ id, t0: stepStart, t1: t });
+
+    // Callouts/blur (M22): active for this step's whole on-screen window. Order and label text
+    // come from the walkthrough's own `callouts:`/`blur:` list; the box each resolves to comes
+    // from this run's manifest (`cap.doc.callouts`/`blur`), keyed by id — an entry whose target
+    // wasn't found this run has no matching manifest id and is skipped, never drawn stale.
+    if (step.callouts && step.callouts.length > 0) {
+      const resolved: Map<string, import("../capture/types.js").Box> = new Map(
+        (cap.doc.callouts ?? []).map((c) => [c.id, c.box] as const),
+      );
+      const items: TimelineCalloutWindow["items"] = [];
+      step.callouts.forEach((c, i) => {
+        const box = resolved.get(c.id);
+        if (box) items.push({ box, num: i + 1, label: c.label });
+      });
+      if (items.length > 0) calloutWindows.push({ t0: stepStart, t1: t, items });
+    }
+    if (step.blur && step.blur.length > 0) {
+      const resolved: Map<string, import("../capture/types.js").Box> = new Map(
+        (cap.doc.blur ?? []).map((b) => [b.id, b.box] as const),
+      );
+      const boxes: import("../capture/types.js").Box[] = [];
+      for (const b of step.blur) {
+        const box = resolved.get(b.id);
+        if (box) boxes.push(box);
+      }
+      if (boxes.length > 0) blurWindows.push({ t0: stepStart, t1: t, boxes });
+    }
   });
 
   // Outro card.

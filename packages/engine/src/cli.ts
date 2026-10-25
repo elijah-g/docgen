@@ -386,7 +386,11 @@ program
       "removeStep <file> <stepId> | " +
       "insertStep <file> --after <stepId>|--before <stepId>|--at-start --id <newId> --do \"...\" [--say ..] [--caption ..] [--page-text ..] [--title ..] [--chapter ..] [--camera full|<targetJson>] | " +
       "setData <file> <dotted.path> <value> | " +
-      "setPageBlock <pageFile> <key> <text> | lock <anchorFile> <item> | unlock <anchorFile> <item>",
+      "setPageBlock <pageFile> <key> <text> | lock <anchorFile> <item> | unlock <anchorFile> <item> | " +
+      "addCallout <file> <stepId> <calloutJson> | updateCallout <file> <stepId> <calloutId> <patchJson> | " +
+      "removeCallout <file> <stepId> <calloutId> | reorderCallouts <file> <stepId> <id1,id2,...> | " +
+      "addBlur <file> <stepId> <blurJson> | updateBlur <file> <stepId> <blurId> <patchJson> | " +
+      "removeBlur <file> <stepId> <blurId>",
   )
   // insertStep's position/field flags (--after/--before/--at-start/--id/--do/--say/--caption/
   // --page-text/--title/--chapter/--camera) aren't declared options on this command — they're

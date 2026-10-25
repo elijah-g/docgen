@@ -47,12 +47,22 @@ export interface CheckResult {
   ok: boolean;
 }
 
+/** A step's callout/blur box, resolved at capture time (M22) — `id` matches the walkthrough
+ * step's `callouts`/`blur` entry it was resolved from, so pages/render can look up the label
+ * (callouts only) and ordering from the walkthrough while trusting this box, which already
+ * followed a `target` to wherever it actually rendered this run. Entries whose target couldn't
+ * be found this run are simply absent — pages/render skip them rather than drawing a stale box. */
+export interface ResolvedBox {
+  id: string;
+  box: Box;
+}
+
 export interface ManifestStep {
   id: string | undefined;
   camera: Camera;
   cameraBox: Box | null;
   events: CaptureEvent[];
-  doc: { image: string | null; highlights: Box[] };
+  doc: { image: string | null; highlights: Box[]; callouts?: ResolvedBox[]; blur?: ResolvedBox[] };
   impact: StepImpact;
   checks: CheckResult[];
 }

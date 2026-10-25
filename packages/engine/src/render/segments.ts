@@ -19,6 +19,8 @@ import type {
   RenderQuality,
   Timeline,
   TimelineAudioCue,
+  TimelineBlurWindow,
+  TimelineCalloutWindow,
   TimelineCamera,
   TimelineCaption,
   TimelineChip,
@@ -67,6 +69,8 @@ export function sliceTimelineForScene(tl: Timeline, scene: TimelineScene): Recor
   const captions: TimelineCaption[] = tl.captions.filter((c) => overlapsRange(c.t0, c.t1, scene.t0, scene.t1));
   const chips: TimelineChip[] = tl.chips.filter((c) => overlapsRange(c.t0, c.t1, scene.t0, scene.t1));
   const audio: TimelineAudioCue[] = tl.audio.filter((a) => inScene(a.t, scene));
+  const callouts: TimelineCalloutWindow[] = (tl.callouts ?? []).filter((w) => overlapsRange(w.t0, w.t1, scene.t0, scene.t1));
+  const blur: TimelineBlurWindow[] = (tl.blur ?? []).filter((w) => overlapsRange(w.t0, w.t1, scene.t0, scene.t1));
   // State carried in from earlier scenes that player.js's renderAt(t0) still reads on entry
   // (e.g. the previous step's frame fading under the outro, or a cursor/camera move started in
   // an earlier scene and still animating into this one) — see state.ts's header comment.
@@ -89,6 +93,8 @@ export function sliceTimelineForScene(tl: Timeline, scene: TimelineScene): Recor
     moves,
     clicks,
     highlights,
+    callouts,
+    blur,
     cameras,
     captions,
     chips,

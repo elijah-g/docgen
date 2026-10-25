@@ -56,3 +56,24 @@ export const TargetSchema: z.ZodType<Target> = z.lazy(() =>
 /** `true` highlights the target itself; a Target highlights a different box. */
 export const HighlightSchema = z.union([z.boolean(), TargetSchema]);
 export type Highlight = boolean | Target;
+
+/**
+ * A fallback box in viewport CSS-px coordinates — the same space Target-derived highlight boxes
+ * already use (capture/locate.ts's `boxOf`, capture/types.ts's `Box`). Used by a step's
+ * `callouts`/`blur` entries when there's no element to pin to (M22).
+ */
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const BoxSchema: z.ZodType<Box> = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number(),
+  })
+  .strict();

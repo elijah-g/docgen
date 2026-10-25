@@ -11,6 +11,12 @@
   const ease = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2) // cubic in-out
   const easeOut = (p) => 1 - Math.pow(1 - p, 3)
   const ramp = (t, t0, d) => clamp((t - t0) / d, 0, 1)
+  const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // Mosaic constants — kept identical to pages/annotate.ts's (same names there) so a blur box
+  // looks and destroys information the same way whether it ends up on a page screenshot or in
+  // the video. See annotate.ts's header comment on MOSAIC_MAX_CELLS for why it's 1.
+  const BLUR_MOSAIC_FACTOR = 20
+  const BLUR_MOSAIC_MAX_CELLS = 1
   const VW = TL.viewport.w, VH = TL.viewport.h
   const K = TL.stage.w / VW
 
@@ -19,6 +25,7 @@
   Object.assign(stage.style, { left: `${TL.stage.x}px`, top: `${TL.stage.y}px`, width: `${TL.stage.w}px`, height: `${TL.stage.h}px` })
   const imgA = $('imgA'), imgB = $('imgB')
   const spot = $('spot'), cursor = $('cursor'), cam = $('cam')
+  const blurLayer = $('blurLayer'), calloutLayer = $('calloutLayer'), calloutLegend = $('calloutLegend')
   const ripples = TL.clicks.map(() => { const r = document.createElement('div'); r.className = 'ripple'; cam.insertBefore(r, cursor); return r })
 
   const brand = TL.brand ?? { name: '' }
@@ -61,6 +68,16 @@
     const dx = m.to.x - m.from.x, dy = m.to.y - m.from.y
     const bend = Math.sin(Math.PI * p) * 0.08
     return { x: lerp(m.from.x, m.to.x, p) - dy * bend, y: lerp(m.from.y, m.to.y, p) + dx * bend }
+  }
+
+  // ------------------------------------------------------------ callouts + blur (M22)
+  // Mirror of packages/engine/src/render/state.ts's calloutsAt/blurAt — see that file's header
+  // note on keeping this in sync.
+  function calloutsAt(t) {
+    return (TL.callouts || []).find((w) => t >= w.t0 && t <= w.t1)
+  }
+  function blurAt(t) {
+    return (TL.blur || []).find((w) => t >= w.t0 && t <= w.t1)
   }
 
   // ------------------------------------------------------------ images
@@ -145,6 +162,24 @@
         })
       } else spot.style.display = 'none'
 
+      // Callouts: numbered badges pinned to their resolved boxes, plus a legend for any with a
+      // label — same red badge/legend styling as pages/annotate.ts's user callouts.
+      const coWin = calloutsAt(t)
+      const items = coWin ? coWin.items : []
+      while (calloutLayer.children.length > items.length) calloutLayer.lastChild.remove()
+      while (calloutLayer.children.length < items.length) {
+        const badge = document.createElement('div')
+        badge.className = 'callout-badge'
+        calloutLayer.appendChild(badge)
+      }
+      items.forEach((item, i) => {
+        const badge = calloutLayer.children[i]
+        badge.textContent = String(item.num)
+        Object.assign(badge.style, { left: `${item.box.x + item.box.w / 2}px`, top: `${item.box.y}px` })
+      })
+      const labelled = items.filter((it) => it.label)
+      calloutLegend.innerHTML = labelled.map((it) => `<div><b>${it.num}.</b>${escapeHtml(it.label)}</div>`).join('')
+
       // Cursor (counter-scaled a little so it never balloons when zoomed).
       const p = cursorAt(t)
       const press = TL.clicks.some((k) => t >= k.t && t <= k.t + 0.16) ? 0.86 : 1
@@ -182,6 +217,64 @@
     } else chipEl.style.opacity = 0
 
     await Promise.all(waits)
+
+    // Blur (burned in at screenshot time, not a removable overlay — see pages/annotate.ts's
+    // header note and docs/scope.md "Safe by default"): a coarse mosaic (downscale then nearest-
+    // neighbour back up — see MOSAIC_MAX_CELLS there) of the current frame, drawn into a canvas
+    // positioned over each active box, nested inside #cam so it pans/zooms with the camera like
+    // everything else the box is meant to track. Must run after `await Promise.all(waits)` above
+    // (imgA/imgB need to have finished decoding before a canvas can draw from them), which is why
+    // this block sits outside the `if (stageVis > 0.001)` block that computed `cur`/`z` earlier —
+    // recomputing `cur` here is cheap and keeps this block from needing those vars hoisted out.
+    if (stageVis > 0.001) {
+      const fi = Math.max(0, lastAtOrBefore(TL.frames, t))
+      const cur = TL.frames[fi]
+      const srcImg = imgB // setSrc(imgB, cur.src) above already resolved and awaited
+      const blurWin = blurAt(t)
+      const blurBoxes = blurWin ? blurWin.boxes : []
+      while (blurLayer.children.length > blurBoxes.length) blurLayer.lastChild.remove()
+      while (blurLayer.children.length < blurBoxes.length) {
+        const canvas = document.createElement('canvas')
+        canvas.className = 'blur-box'
+        blurLayer.appendChild(canvas)
+      }
+      // A "broken" <img> (decode failed/404) makes drawImage throw synchronously — in production
+      // this never happens (the frame files are real, and setSrc's waits already awaited decode
+      // above), but this must still fail *closed*, not open: a blur box that can't draw its
+      // mosaic must never fall through to showing nothing (which would expose whatever the
+      // underlying page content is), so a solid fill stands in for the mosaic instead.
+      const srcReady = srcImg.complete && srcImg.naturalWidth > 0
+      const ratio = srcReady ? srcImg.naturalWidth / VW : 1
+      blurBoxes.forEach((b, i) => {
+        const c = blurLayer.children[i]
+        Object.assign(c.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` })
+        const cw = Math.max(1, Math.round(b.w))
+        const ch = Math.max(1, Math.round(b.h))
+        c.width = cw
+        c.height = ch
+        const ctx = c.getContext('2d')
+        if (!srcReady) {
+          ctx.imageSmoothingEnabled = false
+          ctx.fillStyle = '#111827'
+          ctx.fillRect(0, 0, cw, ch)
+          return
+        }
+        const miniW = Math.max(1, Math.min(BLUR_MOSAIC_MAX_CELLS, Math.round(b.w / BLUR_MOSAIC_FACTOR)))
+        const miniH = Math.max(1, Math.min(BLUR_MOSAIC_MAX_CELLS, Math.round(b.h / BLUR_MOSAIC_FACTOR)))
+        if (!c._mini) c._mini = document.createElement('canvas')
+        const mini = c._mini
+        mini.width = miniW
+        mini.height = miniH
+        const mctx = mini.getContext('2d')
+        mctx.imageSmoothingEnabled = true
+        mctx.drawImage(srcImg, b.x * ratio, b.y * ratio, b.w * ratio, b.h * ratio, 0, 0, miniW, miniH)
+
+        ctx.imageSmoothingEnabled = false // nearest-neighbour upscale — perfectly flat cells
+        ctx.drawImage(mini, 0, 0, miniW, miniH, 0, 0, cw, ch)
+      })
+    } else {
+      while (blurLayer.firstChild) blurLayer.firstChild.remove()
+    }
   }
   window.renderAt = renderAt
 

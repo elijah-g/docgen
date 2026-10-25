@@ -2,6 +2,8 @@
 // edit actions in src/edit/**. Same actions the Studio and (later) the generator MCP server use;
 // see docs/scope.md "Editing" and AGENTS.md.
 import {
+  addBlur,
+  addCallout,
   catchUp,
   EditLockedError,
   EditValidationError,
@@ -9,7 +11,10 @@ import {
   insertStep,
   lock,
   readLastCatchUpAt,
+  removeBlur,
+  removeCallout,
   removeStep,
+  reorderCallouts,
   reorderSteps,
   setData,
   setPageBlock,
@@ -17,13 +22,16 @@ import {
   setStepField,
   undo,
   unlock,
+  updateBlur,
+  updateCallout,
   writeLastCatchUpAt,
   type EditBy,
   type EditResult,
   type HistoryEntry,
+  type OverlayPatch,
   type StepField,
 } from "../edit/index.js";
-import type { Camera } from "../walkthrough/types.js";
+import type { BlurBox, Callout, Camera } from "../walkthrough/types.js";
 
 const EDIT_ACTIONS = [
   "setStepField",
@@ -35,6 +43,13 @@ const EDIT_ACTIONS = [
   "setPageBlock",
   "lock",
   "unlock",
+  "addCallout",
+  "updateCallout",
+  "removeCallout",
+  "reorderCallouts",
+  "addBlur",
+  "updateBlur",
+  "removeBlur",
 ] as const;
 type EditAction = (typeof EDIT_ACTIONS)[number];
 
@@ -106,6 +121,34 @@ function dispatchEdit(action: EditAction, args: string[], by: EditBy): EditResul
       const [file, key, text] = requireArgs(args, 3, "setPageBlock <pageFile> <key> <text>");
       return setPageBlock(file, key, text, { by });
     }
+    case "addCallout": {
+      const [file, stepId, calloutJson] = requireArgs(args, 3, "addCallout <walkthroughFile> <stepId> <calloutJson>");
+      return addCallout(file, stepId, parseJsonArg<Callout>(calloutJson, "addCallout"), { by });
+    }
+    case "updateCallout": {
+      const [file, stepId, calloutId, patchJson] = requireArgs(args, 4, "updateCallout <walkthroughFile> <stepId> <calloutId> <patchJson>");
+      return updateCallout(file, stepId, calloutId, parseJsonArg<OverlayPatch>(patchJson, "updateCallout"), { by });
+    }
+    case "removeCallout": {
+      const [file, stepId, calloutId] = requireArgs(args, 3, "removeCallout <walkthroughFile> <stepId> <calloutId>");
+      return removeCallout(file, stepId, calloutId, { by });
+    }
+    case "reorderCallouts": {
+      const [file, stepId, order] = requireArgs(args, 3, "reorderCallouts <walkthroughFile> <stepId> <id1,id2,...>");
+      return reorderCallouts(file, stepId, order.split(",").map((s) => s.trim()), { by });
+    }
+    case "addBlur": {
+      const [file, stepId, blurJson] = requireArgs(args, 3, "addBlur <walkthroughFile> <stepId> <blurJson>");
+      return addBlur(file, stepId, parseJsonArg<BlurBox>(blurJson, "addBlur"), { by });
+    }
+    case "updateBlur": {
+      const [file, stepId, blurId, patchJson] = requireArgs(args, 4, "updateBlur <walkthroughFile> <stepId> <blurId> <patchJson>");
+      return updateBlur(file, stepId, blurId, parseJsonArg<Pick<OverlayPatch, "target" | "box">>(patchJson, "updateBlur"), { by });
+    }
+    case "removeBlur": {
+      const [file, stepId, blurId] = requireArgs(args, 3, "removeBlur <walkthroughFile> <stepId> <blurId>");
+      return removeBlur(file, stepId, blurId, { by });
+    }
     case "lock": {
       const [anchor, item] = requireArgs(args, 2, "lock <anchorFile> <item>");
       return lock(anchor, item, { by });
@@ -174,6 +217,14 @@ function requireArgs(args: string[], count: number, usage: string): string[] {
     throw new Error(`docgen edit ${usage} — got ${args.length} argument(s)`);
   }
   return args;
+}
+
+function parseJsonArg<T>(raw: string, action: string): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    throw new Error(`${action}: argument is not valid JSON — ${(err as Error).message}`);
+  }
 }
 
 function shortMessage(err: unknown): string {

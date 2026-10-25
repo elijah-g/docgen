@@ -5,7 +5,7 @@
 // signature equality/inequality for each animation kind player.js's renderAt branches on, and a
 // slow test drives the real player through Chromium to confirm the invariant the fast tests
 // assume — "equal signature implies pixel-identical screenshot" — actually holds.
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,6 +13,15 @@ import { writePlayerBundle } from "../../src/render/bundle.js";
 import { frameSignature } from "../../src/render/state.js";
 import type { Timeline } from "../../src/render/types.js";
 import { openRenderBrowser } from "../../src/render/video.js";
+
+// A tiny, valid 1x1 PNG — the parity test's frame cues (`f0.png`/`f1.png`) need to be real,
+// decodable images once M22's blur canvases started reading pixels from the player's <img>
+// elements (`drawImage` throws on a "broken"/undecoded image, unlike the CSS this test used to
+// only exercise).
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 
 const SLOW = process.env.DOCGEN_TEST_SLOW === "1";
 
@@ -128,6 +137,29 @@ describe("frameSignature", () => {
     const tl = baseTimeline({ stageOut: { t0: 1.0, t1: 1.3 }, outro: { title: "O", recap: ["r1"] } });
     expect(frameSignature(tl, 1.4)).not.toBe(frameSignature(tl, 1.6));
   });
+
+  // M22: callouts/blur are static for a step's whole on-screen window (no ramp), so the
+  // signature only needs to flip at the window's edges and when the window's content differs —
+  // no "plateau" case to check, unlike highlights.
+  it("differs while a callout window is active, and when its contents change", () => {
+    const tl = baseTimeline({
+      callouts: [{ t0: T0 + 0.5, t1: T0 + 1.5, items: [{ box: { x: 0, y: 0, w: 10, h: 10 }, num: 1, label: "Click" }] }],
+    });
+    expect(frameSignature(tl, T0 + 0.2)).not.toBe(frameSignature(tl, T0 + 0.7));
+    expect(frameSignature(tl, T0 + 0.7)).toBe(frameSignature(tl, T0 + 1.2)); // same window, same content
+    expect(frameSignature(tl, T0 + 1.6)).toBe(frameSignature(tl, T0 + 0.2)); // window closed again
+
+    const tlMoved = baseTimeline({
+      callouts: [{ t0: T0 + 0.5, t1: T0 + 1.5, items: [{ box: { x: 5, y: 0, w: 10, h: 10 }, num: 1, label: "Click" }] }],
+    });
+    expect(frameSignature(tl, T0 + 0.7)).not.toBe(frameSignature(tlMoved, T0 + 0.7));
+  });
+
+  it("differs while a blur window is active", () => {
+    const tl = baseTimeline({ blur: [{ t0: T0 + 0.5, t1: T0 + 1.5, boxes: [{ x: 0, y: 0, w: 10, h: 10 }] }] });
+    expect(frameSignature(tl, T0 + 0.2)).not.toBe(frameSignature(tl, T0 + 0.7));
+    expect(frameSignature(tl, T0 + 1.6)).toBe(frameSignature(tl, T0 + 0.2));
+  });
 });
 
 // Slow Chromium parity check (DOCGEN_TEST_SLOW=1, `npm run test:slow`): the fast tests above
@@ -165,10 +197,16 @@ describe.skipIf(!SLOW)("frameSignature vs real Chromium render (parity)", () => 
           { t0: 0, t1: 1.5, num: "1", eyebrow: "E1", title: "T1" },
           { t0: 1.5, t1: 3.0, num: "2", eyebrow: "E2", title: "T2" },
         ],
+        // M22: a callout + blur window, each covering only part of the clip, so the fixture
+        // exercises both "window active" and "window closed" against the real player too.
+        callouts: [{ t0: 0.5, t1: 1.8, items: [{ box: { x: 40, y: 40, w: 20, h: 20 }, num: 1, label: "Here" }] }],
+        blur: [{ t0: 1.0, t1: 2.2, boxes: [{ x: 60, y: 60, w: 30, h: 15 }] }],
       });
 
       bundleDir = await mkdtemp(path.join(os.tmpdir(), "docgen-state-parity-"));
       await writePlayerBundle(bundleDir, tl);
+      await writeFile(path.join(bundleDir, "f0.png"), TINY_PNG);
+      await writeFile(path.join(bundleDir, "f1.png"), TINY_PNG);
 
       const frameCount = Math.ceil(tl.duration * tl.fps);
       const { pages, close } = await openRenderBrowser(bundleDir, 0.3, 1);

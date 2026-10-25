@@ -1,7 +1,7 @@
-import type { Target } from "./target.js";
+import type { Target, Box } from "./target.js";
 import type { Action } from "./action.js";
 
-export type { Target, Highlight } from "./target.js";
+export type { Target, Highlight, Box } from "./target.js";
 export type { Action } from "./action.js";
 
 export interface Viewport {
@@ -71,6 +71,30 @@ export interface Validate {
   database?: DatabaseCheck[];
 }
 
+/**
+ * A numbered callout drawn on a step's screenshot and video frames (M22). Pinned to `target`
+ * (resolved to a box from the capture manifest, so it follows the element when the layout
+ * moves) or, when there's no element to pin to, a fixed `box` in viewport CSS-px — the same
+ * coordinate space `boxOf`/highlight boxes already use. Exactly one of `target`/`box` is set
+ * (enforced by the schema). `id` is stable across edits (Studio add/reorder/delete) and is what
+ * the capture manifest keys its resolved box by.
+ */
+export interface Callout {
+  id: string;
+  target?: Target;
+  box?: Box;
+  /** Short label text shown in the page/video legend next to the callout's number. */
+  label?: string;
+}
+
+/** A box to blur (burn in, not a CSS overlay) on a step's screenshot and video frames — for
+ * hiding personal data. Same target-or-box pinning as `Callout`, no label. */
+export interface BlurBox {
+  id: string;
+  target?: Target;
+  box?: Box;
+}
+
 /** One step of a walkthrough: an action plus what it says, shows and checks. */
 export interface Step {
   id?: string;
@@ -88,6 +112,10 @@ export interface Step {
   camera?: Camera;
   /** Seconds to hold on the step's final state, for pacing. */
   hold?: number;
+  /** Numbered callouts drawn on this step's screenshot/video — see `Callout`. */
+  callouts?: Callout[];
+  /** Boxes blurred (burned in) on this step's screenshot/video — see `BlurBox`. */
+  blur?: BlurBox[];
   /** The fully resolved action list — from `do:`, `check:` and/or `actions:`. */
   actions: Action[];
 }

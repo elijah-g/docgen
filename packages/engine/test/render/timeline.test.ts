@@ -158,4 +158,109 @@ describe("buildTimeline", () => {
     expect(tl.scenes![tl.scenes!.length - 1].t1).toBe(tl.duration);
     for (const s of tl.scenes!) expect(s.t1).toBeGreaterThan(s.t0);
   });
+
+  it("builds a callout window from the step's callouts + the manifest's resolved boxes, in callout order", () => {
+    const withCallouts = wf({
+      steps: [
+        {
+          id: "step-one",
+          chapter: "Chapter A",
+          title: "Step one",
+          say: "Step one narration",
+          caption: "Step one caption",
+          camera: "full",
+          actions: [],
+          callouts: [
+            { id: "c2", box: { x: 1, y: 1, w: 1, h: 1 }, label: "second" },
+            { id: "c1", box: { x: 0, y: 0, w: 1, h: 1 }, label: "first" },
+          ],
+        },
+      ],
+    });
+    const m = manifest({
+      steps: [
+        {
+          id: "step-one",
+          camera: "full",
+          cameraBox: null,
+          events: [{ type: "frame", image: "0001-state.png", transition: "cut" }],
+          doc: {
+            image: "0001-state.png",
+            highlights: [],
+            callouts: [
+              { id: "c1", box: { x: 10, y: 20, w: 30, h: 40 } },
+              { id: "c2", box: { x: 50, y: 60, w: 5, h: 5 } },
+            ],
+          },
+          impact: { urls: [], requests: [] },
+          checks: [],
+        },
+      ],
+    });
+
+    const tl = buildTimeline(withCallouts, m, narration, { fps: 30 });
+    expect(tl.callouts).toHaveLength(1);
+    const window = tl.callouts![0];
+    // Numbering follows the walkthrough's own callouts order (c2 first, c1 second), not the
+    // manifest's order — the manifest is only consulted for each id's resolved box.
+    expect(window.items).toEqual([
+      { box: { x: 50, y: 60, w: 5, h: 5 }, num: 1, label: "second" },
+      { box: { x: 10, y: 20, w: 30, h: 40 }, num: 2, label: "first" },
+    ]);
+    expect(window.t0).toBe(tl.scenes!.find((s) => s.id === "step-one")!.t0);
+    expect(window.t1).toBe(tl.scenes!.find((s) => s.id === "step-one")!.t1);
+  });
+
+  it("drops a callout whose target wasn't resolved this run, instead of drawing a stale box", () => {
+    const withCallouts = wf({
+      steps: [
+        {
+          id: "step-one",
+          chapter: "Chapter A",
+          title: "Step one",
+          say: "Step one narration",
+          caption: "Step one caption",
+          camera: "full",
+          actions: [],
+          callouts: [{ id: "missing", target: { role: "button", name: "Gone" } }],
+        },
+      ],
+    });
+    // No matching "missing" id in the manifest's doc.callouts — the target wasn't found this run.
+    const tl = buildTimeline(withCallouts, manifest(), narration, { fps: 30 });
+    expect(tl.callouts).toEqual([]);
+  });
+
+  it("builds a blur window the same way", () => {
+    const withBlur = wf({
+      steps: [
+        {
+          id: "step-one",
+          chapter: "Chapter A",
+          title: "Step one",
+          say: "Step one narration",
+          caption: "Step one caption",
+          camera: "full",
+          actions: [],
+          blur: [{ id: "b1", box: { x: 0, y: 0, w: 1, h: 1 } }],
+        },
+      ],
+    });
+    const m = manifest({
+      steps: [
+        {
+          id: "step-one",
+          camera: "full",
+          cameraBox: null,
+          events: [{ type: "frame", image: "0001-state.png", transition: "cut" }],
+          doc: { image: "0001-state.png", highlights: [], blur: [{ id: "b1", box: { x: 5, y: 6, w: 70, h: 20 } }] },
+          impact: { urls: [], requests: [] },
+          checks: [],
+        },
+      ],
+    });
+    const tl = buildTimeline(withBlur, m, narration, { fps: 30 });
+    const stepScene = tl.scenes!.find((s) => s.id === "step-one")!;
+    expect(tl.blur).toEqual([{ t0: stepScene.t0, t1: stepScene.t1, boxes: [{ x: 5, y: 6, w: 70, h: 20 }] }]);
+  });
 });

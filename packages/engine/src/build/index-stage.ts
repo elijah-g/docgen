@@ -235,6 +235,7 @@ export function runIndexStage(opts: IndexStageOptions): IndexStageResult {
     const validIds = opts.walkthroughIds ? new Set(opts.walkthroughIds) : undefined;
     const result = buildProcedures({
       sources,
+      pagesDir: opts.pagesDir,
       videoDir: opts.videoDir,
       publicDir,
       existing,

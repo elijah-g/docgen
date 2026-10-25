@@ -83,21 +83,55 @@ function writeCapture(captureDir: string, opts: { ok?: boolean } = {}): void {
   writeFileSync(join(captureDir, "validation.json"), JSON.stringify(validation));
 }
 
+/** A fake `pagesDir/<id>/screenshots/step-NN.png` for each step — stands in for what
+ * pages/build.ts's `annotateFrame` actually wrote (blur/callouts already burned in). Content
+ * distinct from `TINY_PNG` (the raw capture frame) so a test can tell which one a copy used —
+ * doesn't need to be a real PNG, only distinguishable bytes. */
+const BLURRED_PNG = Buffer.from("not-the-raw-frame-this-is-the-annotated-page-screenshot");
+
+function writePagesScreenshots(pagesDir: string, id: string, stepCount: number): void {
+  const dir = join(pagesDir, id, "screenshots");
+  mkdirSync(dir, { recursive: true });
+  for (let n = 1; n <= stepCount; n++) {
+    writeFileSync(join(dir, `step-${String(n).padStart(2, "0")}.png`), BLURRED_PNG);
+  }
+}
+
 describe("buildProcedure", () => {
   it("builds ordered steps with plain-text instructions and a screenshot URL, only for passed captures", () => {
     const captureDir = tmpDir("docgen-proc-capture-");
     const publicDir = tmpDir("docgen-proc-public-");
+    const pagesDir = tmpDir("docgen-proc-pages-");
     writeCapture(captureDir);
+    writePagesScreenshots(pagesDir, "add-competitor", 2);
 
-    const proc = buildProcedure(walkthrough(), captureDir, { publicDir });
+    const proc = buildProcedure(walkthrough(), captureDir, { publicDir, pagesDir });
     expect(proc).toBeDefined();
     expect(proc!.id).toBe("add-competitor");
     expect(proc!.start).toEqual({ page: "/competitors", role: "office-staff" });
     expect(proc!.steps).toHaveLength(2);
     expect(proc!.steps[0]).toMatchObject({ n: 1, title: "Open competitors", instruction: "Click Competitors in the menu." });
     expect(proc!.steps[0].screenshot).toBe("/screenshots/add-competitor/step-01.png");
-    expect(existsSync(join(publicDir, "screenshots", "add-competitor", "step-01.png"))).toBe(true);
+    const publicScreenshot = join(publicDir, "screenshots", "add-competitor", "step-01.png");
+    expect(existsSync(publicScreenshot)).toBe(true);
     expect(proc!.impactRoutes).toEqual(["/competitors"]);
+
+    // The safety-critical bit (M22 review): the published copy is the page's already-annotated
+    // screenshot (blur/callouts burned in), never the raw capture frame straight from
+    // captureDir/frames — if `blur:` had masked something in this step, a raw-frame copy would
+    // publish it unmasked.
+    expect(readFileSync(publicScreenshot)).toEqual(BLURRED_PNG);
+    expect(readFileSync(publicScreenshot)).not.toEqual(TINY_PNG);
+  });
+
+  it("never copies a screenshot when pagesDir is omitted — no raw-frame fallback", () => {
+    const captureDir = tmpDir("docgen-proc-capture-");
+    const publicDir = tmpDir("docgen-proc-public-");
+    writeCapture(captureDir);
+
+    const proc = buildProcedure(walkthrough(), captureDir, { publicDir });
+    expect(proc!.steps[0].screenshot).toBeUndefined();
+    expect(existsSync(join(publicDir, "screenshots"))).toBe(false);
   });
 
   it("returns undefined when the capture didn't pass — never hands an agent an unverified procedure", () => {

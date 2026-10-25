@@ -6,7 +6,17 @@
 // screen, the cursor/camera mid-move, an open highlight) without spinning up a browser. Keep
 // this in sync with player.js's `lastAtOrBefore`/`cameraAt`/`cursorAt`/highlight-find by hand —
 // same pattern as timeline.ts's header note that it's a hand-kept port of compose.mjs.
-import type { CameraFrame, Point, Timeline, TimelineCaption, TimelineChip, TimelineFrameCue, TimelineHighlight } from "./types.js";
+import type {
+  CameraFrame,
+  Point,
+  Timeline,
+  TimelineBlurWindow,
+  TimelineCalloutWindow,
+  TimelineCaption,
+  TimelineChip,
+  TimelineFrameCue,
+  TimelineHighlight,
+} from "./types.js";
 
 function lastAtOrBefore<T>(list: T[], t: number, key: (item: T) => number): number {
   let lo = 0;
@@ -61,6 +71,17 @@ export function cursorAt(tl: Timeline, t: number): Point {
 /** Mirrors player.js's highlight find: `TL.highlights.find((h) => t >= h.t0 && t <= h.t1)`. */
 export function highlightAt(tl: Timeline, t: number): TimelineHighlight | undefined {
   return tl.highlights.find((h) => t >= h.t0 && t <= h.t1);
+}
+
+/** M22: the active callout window at `t` (a step's whole on-screen window, not an animated
+ * ramp like `highlightAt`) — mirrors player.js's `calloutsAt`. */
+export function calloutsAt(tl: Timeline, t: number): TimelineCalloutWindow | undefined {
+  return (tl.callouts ?? []).find((w) => t >= w.t0 && t <= w.t1);
+}
+
+/** M22: the active blur window at `t` — mirrors player.js's `blurAt`. */
+export function blurAt(tl: Timeline, t: number): TimelineBlurWindow | undefined {
+  return (tl.blur ?? []).find((w) => t >= w.t0 && t <= w.t1);
 }
 
 /** Mirrors player.js's caption find. */
@@ -149,6 +170,17 @@ export function frameSignature(tl: Timeline, t: number): string {
       const a = Math.min(easeOut(ramp(t, hi.t0, 0.3)), 1 - ramp(t, hi.t1 - 0.25, 0.25));
       push(hi.box.x, hi.box.y, hi.box.w, hi.box.h, a);
     } else push("none");
+
+    // M22: callouts/blur are static for a step's whole window (no ramp/animation), so their
+    // signature term is just every value that ends up on screen for them.
+    const co = calloutsAt(tl, t);
+    if (co) {
+      for (const item of co.items) push(item.box.x, item.box.y, item.box.w, item.box.h, item.num, item.label ?? "");
+    } else push("nocallouts");
+    const bl = blurAt(tl, t);
+    if (bl) {
+      for (const box of bl.boxes) push(box.x, box.y, box.w, box.h);
+    } else push("noblur");
 
     const p = cursorAt(tl, t);
     const press = tl.clicks.some((k) => t >= k.t && t <= k.t + 0.16) ? 0.86 : 1;

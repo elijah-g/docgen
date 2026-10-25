@@ -37,6 +37,30 @@ export interface TimelineHighlight {
   box: Box;
 }
 
+/** One numbered, optionally-labelled callout box, active for a step's whole on-screen window
+ * (M22) — unlike `TimelineHighlight`, several can be active at once (a step's `callouts:` list),
+ * so they're grouped per window rather than one-at-a-time. */
+export interface TimelineCalloutItem {
+  box: Box;
+  num: number;
+  label?: string;
+}
+
+export interface TimelineCalloutWindow {
+  t0: number;
+  t1: number;
+  items: TimelineCalloutItem[];
+}
+
+/** One blur box, active for a step's whole on-screen window. Burned into the frame the player
+ * draws (CSS filter rasterised by the screenshot, same as pages/annotate.ts), never a removable
+ * overlay. */
+export interface TimelineBlurWindow {
+  t0: number;
+  t1: number;
+  boxes: Box[];
+}
+
 export interface TimelineCamera {
   t0: number;
   t1: number;
@@ -87,6 +111,12 @@ export interface Timeline {
   moves: TimelineMove[];
   clicks: TimelineClick[];
   highlights: TimelineHighlight[];
+  /** User-added numbered callouts (M22), one window per step that has any. Optional, like
+   * `scenes`, so hand-built `Timeline` fixtures in tests outside render/** stay valid;
+   * `buildTimeline()` always populates it. Render-side code should fall back to `[]`. */
+  callouts?: TimelineCalloutWindow[];
+  /** Burned-in blur boxes (M22), one window per step that has any. Same optionality as `callouts`. */
+  blur?: TimelineBlurWindow[];
   cameras: TimelineCamera[];
   captions: TimelineCaption[];
   chips: TimelineChip[];

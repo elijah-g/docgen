@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TargetSchema } from "./target.js";
+import { TargetSchema, BoxSchema } from "./target.js";
 import { ActionSchema } from "./action.js";
 import { parseDoString } from "./parse-do.js";
 import type { Step, Walkthrough } from "./types.js";
@@ -81,6 +81,34 @@ const ValidateSchema = z
   .object({ database: z.array(DatabaseCheckSchema).optional() })
   .strict();
 
+// A callout/blur box pins to exactly one of `target` (resolved to a box from the capture
+// manifest at page/render time, so it follows the element when the layout moves) or a fixed
+// `box` (viewport CSS-px, the same space `boxOf`/highlight boxes use) — never both, never
+// neither, or the Studio/CLI edit actions that write these would have no single source of truth
+// for where the box actually is.
+const CalloutSchema = z
+  .object({
+    id: z.string(),
+    target: TargetSchema.optional(),
+    box: BoxSchema.optional(),
+    label: z.string().optional(),
+  })
+  .strict()
+  .refine((c) => Boolean(c.target) !== Boolean(c.box), {
+    message: "a callout needs exactly one of `target` or `box`",
+  });
+
+const BlurBoxSchema = z
+  .object({
+    id: z.string(),
+    target: TargetSchema.optional(),
+    box: BoxSchema.optional(),
+  })
+  .strict()
+  .refine((b) => Boolean(b.target) !== Boolean(b.box), {
+    message: "a blur box needs exactly one of `target` or `box`",
+  });
+
 /**
  * The raw shape a YAML file may use: short plain-words fields (`do`, `check`)
  * alongside, or instead of, a full `actions:` list. `RawStepSchema.toStep()`
@@ -99,6 +127,8 @@ const RawStepSchema = z
     mask: z.array(z.string()).optional(),
     camera: CameraSchema.optional(),
     hold: z.number().optional(),
+    callouts: z.array(CalloutSchema).optional(),
+    blur: z.array(BlurBoxSchema).optional(),
     actions: z.array(ActionSchema).optional(),
   })
   .strict()
@@ -164,6 +194,8 @@ export function rawStepToStep(raw: RawStep): Step {
     mask: raw.mask,
     camera: raw.camera,
     hold: raw.hold,
+    callouts: raw.callouts,
+    blur: raw.blur,
     actions,
   };
 }

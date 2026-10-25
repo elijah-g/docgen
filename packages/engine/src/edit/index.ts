@@ -12,6 +12,16 @@ export {
   type RemovedStep,
   type InsertStepOptions,
 } from "./steps.js";
+export {
+  addCallout,
+  updateCallout,
+  removeCallout,
+  reorderCallouts,
+  addBlur,
+  updateBlur,
+  removeBlur,
+  type OverlayPatch,
+} from "./callouts.js";
 export { setPageBlock } from "./page.js";
 export { setData } from "./data.js";
 export { lock, unlock, isLocked, isLockedAny, readLocks } from "./locks.js";

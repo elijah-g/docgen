@@ -94,7 +94,13 @@ export async function buildPage(wf: Walkthrough, captureDir: string, outDir: str
   // Per-step status + screenshot annotation. manifest/validation steps are shorter than
   // wf.steps when capture stopped early on a failure — those later steps have no data yet.
   const statuses: StepStatus[] = [];
-  const screenshotJobs: { stepNumber: number; frame: string; highlights: { x: number; y: number; w: number; h: number }[] }[] = [];
+  const screenshotJobs: {
+    stepNumber: number;
+    frame: string;
+    highlights: { x: number; y: number; w: number; h: number }[];
+    callouts: { box: { x: number; y: number; w: number; h: number }; label?: string }[];
+    blur: { x: number; y: number; w: number; h: number }[];
+  }[] = [];
 
   for (let i = 0; i < wf.steps.length; i++) {
     const stepNumber = i + 1;
@@ -109,7 +115,23 @@ export async function buildPage(wf: Walkthrough, captureDir: string, outDir: str
     if (!ok) status.problem = vStep?.error ?? "this step did not pass the last capture";
     statuses.push(status);
     if (mStep.doc.image) {
-      screenshotJobs.push({ stepNumber, frame: mStep.doc.image, highlights: mStep.doc.highlights });
+      // Callout order and label text come from the walkthrough's own `callouts:` list (so the
+      // Studio's reorder/edit actions control it); the box each resolves to comes from this
+      // run's manifest, keyed by id — an entry whose target wasn't found this run (manifest has
+      // no matching id) is skipped rather than drawn with a stale box.
+      const resolvedCallouts = new Map((mStep.doc.callouts ?? []).map((c) => [c.id, c.box] as const));
+      const resolvedBlur = new Map((mStep.doc.blur ?? []).map((b) => [b.id, b.box] as const));
+      const callouts: { box: { x: number; y: number; w: number; h: number }; label?: string }[] = [];
+      for (const c of wf.steps[i].callouts ?? []) {
+        const box = resolvedCallouts.get(c.id);
+        if (box) callouts.push({ box, label: c.label });
+      }
+      const blur: { x: number; y: number; w: number; h: number }[] = [];
+      for (const b of wf.steps[i].blur ?? []) {
+        const box = resolvedBlur.get(b.id);
+        if (box) blur.push(box);
+      }
+      screenshotJobs.push({ stepNumber, frame: mStep.doc.image, highlights: mStep.doc.highlights, callouts, blur });
     }
   }
 
@@ -202,7 +224,13 @@ export async function buildPage(wf: Walkthrough, captureDir: string, outDir: str
 async function renderScreenshots(
   captureDir: string,
   manifest: CaptureManifest,
-  jobs: { stepNumber: number; frame: string; highlights: { x: number; y: number; w: number; h: number }[] }[],
+  jobs: {
+    stepNumber: number;
+    frame: string;
+    highlights: { x: number; y: number; w: number; h: number }[];
+    callouts: { box: { x: number; y: number; w: number; h: number }; label?: string }[];
+    blur: { x: number; y: number; w: number; h: number }[];
+  }[],
   screenshotsDir: string,
   opts: BuildPageOptions,
 ): Promise<string[]> {
@@ -226,6 +254,8 @@ async function renderScreenshots(
       const outPath = path.join(screenshotsDir, path.basename(screenshotFile(job.stepNumber)));
       await annotateFrame(page, framePath, manifest.viewport, job.highlights, job.stepNumber, outPath, {
         width: opts.screenshotWidth,
+        callouts: job.callouts,
+        blur: job.blur,
       });
       written.push(outPath);
     }

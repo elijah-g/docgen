@@ -58,7 +58,7 @@ TallyUp's page, screenshots, video and captions from one command.
 | M19 | Change tiers + repair in CI: cosmetic / broken / new; cosmetic publishes, broken gets a built-in agent repair and a docs PR, new gets a `docs:new` draft; budget cap | todo | Phase 2, needs M17, M18 |
 | M20 | Playwright test import: turn existing Playwright tests into walkthrough drafts | done | `docgen import playwright <glob>`: TS compiler API, one draft per `test()`, locator chains to target hints, unmappable calls kept as `# TODO from test:` comments, emails/phones masked. emh-check: 42 specs to 343 drafts, all valid; 35% of calls mapped (schema has no press/hover/focus, many custom helpers, negated asserts) | Phase 2 |
 | M21 | Versioned docs + What's new: release tag freezes a version; chat and agent connector answer per version; What's new page from merged PRs | done | `docgen version freeze|list` snapshots search index, procedures and llms.txt to `public/versions/<name>` + versions.json; `/v/<name>/...` routes and a version switcher; chat (`version` in body) and MCP (`?version=`) answer per version, unknown version lists the known ones. `docgen whats-new` writes What's new from app-repo git log or `gh pr list`, chores filtered, human edits kept. Orchestrator fixed: newest named version read the current build; unsafe version names; history read from the config's folder instead of the app repo | Phase 2 |
-| M22 | Studio Phase 2: numbered callouts and blur boxes pinned to targets, hold times, simple timeline | doing | Phase 2, after M16 |
+| M22 | Studio Phase 2: numbered callouts and blur boxes pinned to targets, hold times, simple timeline | done | Per-step `callouts` (numbered, labelled) and `blur` boxes, each pinned to a target or a fixed box; capture resolves targets to boxes per step; pages and video burn them in. Blur collapses the box to one colour (mosaic of 1 cell), so nothing is recoverable. Studio: click a highlighted element to pin (`target:`), drag for a fixed box, label, reorder, delete; step timeline; all through shared edit actions with undo, plus `docgen edit`. Orchestrator review found published procedure screenshots copied raw frames (bypassing blur); fixed with a test that scans every output for raw bytes | Phase 2 |
 
 ## Log
 
@@ -94,6 +94,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - 2026-10-25 · Wave 1 had not started (no code found). Initial commit `f34f701` (generated example videos/PDFs ignored; author set repo-local to Bunbury AI). Wave 1 builders launched; orchestrator owns cli.ts, index.ts, package.json and this file.
 - 2026-10-25 · Wave 1: M20 done (`0e8139c`), M16 part done (`9783df1`), M17 + M21 done. M17 first pass said "all" for nearly every real TallyUp commit (blanket lib/components rules); sent back for an import graph. Full suite 842 pass / 9 skipped in 241 s; typecheck clean.
 - 2026-10-25 · M16 done: frame reuse by timeline signature; parity tests added after orchestrator review (unguarded duplicate of player.js math).
+- 2026-10-25 · M22 done after review (irreversible blur, no raw frames published, Studio pins to targets, custom buildDir). Full suite 907 pass / 11 skipped.
 
 ## Follow-ups
 

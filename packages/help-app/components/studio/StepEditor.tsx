@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import type { StudioStep } from "./types";
 
@@ -19,6 +20,7 @@ export function StepEditor({
   onSelect,
   onSave,
   saving,
+  children,
 }: {
   step: StudioStep;
   index: number;
@@ -26,6 +28,7 @@ export function StepEditor({
   onSelect: () => void;
   onSave: (field: "title" | "say" | "caption" | "page_text" | "hold", value: string | number) => void;
   saving: boolean;
+  children?: ReactNode;
 }) {
   return (
     <div
@@ -62,6 +65,7 @@ export function StepEditor({
           />
         ))}
       </div>
+      {children ? <div className="mt-3 border-t border-fd-border pt-3" onClick={(e) => e.stopPropagation()}>{children}</div> : null}
       {saving ? <p className="mt-1 text-xs text-fd-muted-foreground">Saving…</p> : null}
     </div>
   );

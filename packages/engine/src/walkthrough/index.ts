@@ -4,6 +4,8 @@ export type {
   Action,
   Target,
   Highlight,
+  Callout,
+  BlurBox,
   Camera,
   Start,
   Viewport,
@@ -14,7 +16,7 @@ export type {
   DatabaseCheck,
   Validate,
 } from "./types.js";
-export { TargetSchema, HighlightSchema } from "./target.js";
+export { TargetSchema, HighlightSchema, BoxSchema } from "./target.js";
 export { ActionSchema } from "./action.js";
 export { parseDoString } from "./parse-do.js";
 export {
