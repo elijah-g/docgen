@@ -339,8 +339,8 @@ People without CI get the same behaviour from the deploy hook or the GitHub App.
 | Kind | Example | What happens | Who's asked |
 | --- | --- | --- | --- |
 | Cosmetic | A button moved or restyled; the flow is the same | Screenshots and video refresh and publish | Nobody |
-| Broken | A step can't find its button or a check fails | An agent repairs the walkthrough, re-runs it and opens a docs PR. With no agent set up, the build fails with a clear report | Reviewer of the PR |
-| New | A new screen no walkthrough covers | An agent drafts a new walkthrough and page as a PR labelled `docs:new` | Reviewer of the PR |
+| Broken | A step can't find its button or a check fails | The PR comment flags it with the command to run; Claude Code repairs the walkthrough, re-runs it and opens a docs PR (locally, or in CI through the optional Claude Code GitHub Action) | Author of the app PR |
+| New | A new screen no walkthrough covers | Claude Code drafts a new walkthrough and page as a PR labelled `docs:new` | Author of the app PR |
 
 ### Human edits are never overwritten
 
@@ -352,7 +352,7 @@ Each page mixes generated blocks (built from walkthroughs) and blocks a person w
 - **Vibe coders** get an email or Slack message with Approve and "Fix it" buttons.
 - **Anyone** can tag `@docgen` on a PR or issue to ask for a change.
 
-A budget cap per run stops costs running away.
+CI itself uses no model and no API key: it maps the diff, re-captures and diffs screenshots, and comments. Judgment work runs through Claude Code on the user's own plan, so there is no per-run dollar cap. Screenshot diffs live on a `docgen-previews` branch in the app repo so the PR comment can show them inline.
 
 ## Safety and trust
 
@@ -389,7 +389,7 @@ Each skill names its tier, so a coding agent can run it with the matching model 
 
 **The engine feeds agents small inputs.** Commands print a short summary by default and JSON with `--json`. A failed step reports the step, the error, and a trimmed accessibility snapshot of the page, never full HTML or logs. `docgen digest` gives a compact map of routes, roles and labels so an agent doesn't read the whole repo. Skills stay short and load reference files only when needed.
 
-**Caching and budgets.** Stable prompt parts (style guide, glossary, schema) come first so provider prompt caching applies. Each run reports tokens and cost per stage and model, and stops at the per-run budget cap.
+**Caching and budgets.** Stable prompt parts (style guide, glossary, schema) come first so provider prompt caching applies. Each run reports tokens per stage and model. Model work runs through Claude Code, not API keys.
 
 ## Scope by phase
 

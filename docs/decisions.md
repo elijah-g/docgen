@@ -1,6 +1,6 @@
 # Decisions
 
-Last updated 2026-10-22. "Agreed direction" means discussed and accepted in planning, not yet tested
+Last updated 2026-10-25. "Agreed direction" means discussed and accepted in planning, not yet tested
 in code. Revisit any of them with evidence from Phase 0.
 
 ## Agreed direction
@@ -28,6 +28,10 @@ in code. Revisit any of them with evidence from Phase 0.
 | 19 | The Studio is a dev-only `/studio` route in the help app that edits repo files (Keystatic/TinaCMS style); later it can run on a preview deploy behind sign-in, committing to GitHub | Runs where the agent runs; gives a path to a hosted Studio without a separate cloud editor |
 | 20 | Token efficiency is a design goal: model tokens only for judgment; three model tiers (fast, standard, deep) per skill; subagents per app area and per walkthrough; small engine outputs; per-run token report and budget | The user's steer (2026-10-22); model tokens are the main running cost and long contexts make weaker agents fumble |
 | 21 | docgen itself is built by an orchestrating agent with subagents on matched models (Haiku for lookups, Sonnet for building, Opus for design and review), tested against `~/competition-management` (TallyUp) | Same principle applied to the build; see [build-plan.md](build-plan.md) |
+| 22 | No model API keys in docgen's own pipeline: judgment work runs through Claude Code. CI does deterministic work only (affected, capture, screenshot diffs, PR comment); broken or new walkthroughs are flagged with the command to run. Optional: the Claude Code GitHub Action on the user's subscription (`claude setup-token` OAuth token) repairs on request. No dollar budget cap | The user's steer (2026-10-25); keeps the engine keyless and free to run |
+| 23 | PR screenshot diffs are committed to a `docgen-previews` orphan branch in the app repo and shown inline in one PR comment; Actions artifacts as fallback. No preview deploys for now | Needs only the workflow's own GitHub token; no extra service or key |
+| 24 | Docs PRs from docgen request review from the app PR's author (configurable); drafted walkthroughs get the `docs:new` label | The author knows what changed |
+| 25 | docgen is a public repo; GitHub owner and repo are per-user settings, never hardcoded. Help chat is off until an owner adds their own key | Open-source engine; the chat can't run through Claude Code |
 
 ## Open
 
@@ -37,7 +41,6 @@ in code. Revisit any of them with evidence from Phase 0.
 | First target user | Vibe coders in Cursor or Claude Code (agent door first); Lovable and Bolt users (GitHub App first) | Agent door first |
 | Walkthrough format | YAML with a schema; Markdown with step notes (Doc Detective style); JSON (Argo/TallyUp style) | YAML with a schema, after comparing Argo, Doc Detective and TallyUp's `workflow.json` |
 | Docs layer in the Next.js help app | Fumadocs; Nextra; custom | Fumadocs (built for the App Router); check print support in Phase 1 |
-| Who pays for chat on free sites | Owner brings a key; cloud credits; local model only | Owner's key when self-hosting; credits in the cloud |
 | Licence | Apache-2.0; MIT; source-available | Apache-2.0 |
 | Second app to test on | Another app in the workspace; a friendly client's app | One with a different stack from TallyUp |
 | Name | docgen is a placeholder | Pick before the first public release |

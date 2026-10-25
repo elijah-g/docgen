@@ -205,3 +205,16 @@ fail-open masking). Measuring the spec's first-capture target drove a new `docge
 (a signed-in, read-only accessibility map of a page, ~450–600 tokens versus ~4,900 to read the
 page's source) and label short-name matching: first-capture pass rate went 2/5 → 1/5 → 7/8 (88%)
 across emh-check and TallyUp. Details in build-plan.md.
+
+## 2026-10-25 · Phase 2 wave 1; CI without keys; going public
+
+Built M16 (cold draft render 174 s → 59 s, quick reference card 1.78 MB → 65 KB), M17 (`docgen
+affected`: import graph from routes; 9 of TallyUp's last 12 commits mapped precisely), M20
+(Playwright test import) and M21 (versioned docs, What's new). For M18/M19 the user decided: no
+model API keys and no dollar budget cap — all judgment through Claude Code, with CI doing only
+deterministic work plus an optional Claude Code GitHub Action on the user's subscription;
+screenshot diffs on an orphan branch, no preview deploys yet; docs PRs reviewed by the app PR's
+author with a `docs:new` label; help chat off until an owner adds a key. docgen goes public on
+GitHub (owner configurable per user); the TallyUp pilot may add the docs workflow to
+`competition-management`. Material copied from private apps (`reference/tallyup`, the emh-check
+example) stays local and out of the public history. Decisions 22–25.
