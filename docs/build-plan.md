@@ -96,6 +96,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - 2026-10-25 · M16 done: frame reuse by timeline signature; parity tests added after orchestrator review (unguarded duplicate of player.js math).
 - 2026-10-25 · M22 done after review (irreversible blur, no raw frames published, Studio pins to targets, custom buildDir). Full suite 907 pass / 11 skipped.
 - 2026-10-25 · M18 done after review (baselines from the help app on disk so diffs are real; CI database from the app's migrations, no training dump; fork PRs and shell-injection hardening). Full suite 909 pass / 11 skipped; typecheck clean.
+- 2026-10-25 · TallyUp pilot validated end to end from a clean clone of main: CI database from tracked migrations (three training-only SQL functions recreated from tracked files), runner-local Postgres with SSL, baselines re-taken from main (old ones came from the training branch), `docgen ci` resets demo data before every walkthrough, seed rows given fixed ids (random tiebreak reordered lists).
 
 ## Follow-ups
 
@@ -108,7 +109,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Phase 2 left: GitHub Action and PR check (M18), change tiers and CI repair (M19), Studio callouts and timeline (M22). Answers in decisions 22–25 (no keys in CI, screenshot diffs on an orphan branch, public repo).
 - Playwright import maps 35% of emh-check calls: add `press`/`hover`/`focus` actions and exact-text checks to the walkthrough format to raise it.
 - Frozen versions don't copy screenshots and render old pages as plain Markdown; What's new lists every commit (dependency upgrades included) under General until it is grouped with the impact map.
-- Walkthroughs that save data change each other's screenshots within one run (recording a payment changes unpaid entries): reset demo data per walkthrough or order them.
+- Two sub-0.2% screenshot flaps on identical TallyUp code (a toast mid-fade; one list row): would post noisy "changed" lines. Wait for animations to finish before the doc screenshot, then re-measure.
 - TallyUp CI schema: `get_show_id_for_entry()` has no tracked definition (training only); its index is skipped in CI.
 - Scaffolded help apps don't update when the template changes (examples/tallyup was missing M21/M22 until synced by hand): add `docgen upgrade` (scope.md risks table).
 - Studio page preview shows raw frontmatter, literal `<strong>` tags and broken image links; the Welcome page stays the template placeholder after `docgen build`.

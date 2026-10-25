@@ -41,8 +41,15 @@ export async function captureWalkthroughForCi(file: string, config: ResolvedConf
   const storageStatePath = join(config.buildDir, ".docgen-session", `storageState-ci-${storageStateKey(baseUrl, walkthrough)}.json`);
 
   try {
-    const needsDbReset = Boolean(config.database && walkthrough.validate?.database?.length);
-    if (needsDbReset && config.database) {
+    // Unlike commands/capture.ts (local dev, where reset() can be an expensive full training-dump
+    // rebuild and is worth skipping for walkthroughs that don't assert against the database),
+    // `docgen ci` resets before every walkthrough whenever a database adapter is configured — CI's
+    // reset is expected to be a cheap, data-only reseed, and walkthroughs in the same run share
+    // one database: without resetting between them, an earlier write-walkthrough's leftover rows
+    // bleed into a later read-only walkthrough's screenshot (e.g. a filter/count page), which
+    // shows up as a false "changed" on code that never touched it (orchestrator review of M18's
+    // TallyUp pilot, 2026-10-25).
+    if (config.database) {
       const dbUrl = await config.database.url();
       assertLocalDatabase(dbUrl);
       await config.database.reset?.();
