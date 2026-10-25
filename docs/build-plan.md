@@ -110,4 +110,6 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Frozen versions don't copy screenshots and render old pages as plain Markdown; What's new lists every commit (dependency upgrades included) under General until it is grouped with the impact map.
 - Walkthroughs that save data change each other's screenshots within one run (recording a payment changes unpaid entries): reset demo data per walkthrough or order them.
 - TallyUp CI schema: `get_show_id_for_entry()` has no tracked definition (training only); its index is skipped in CI.
+- Scaffolded help apps don't update when the template changes (examples/tallyup was missing M21/M22 until synced by hand): add `docgen upgrade` (scope.md risks table).
+- Studio page preview shows raw frontmatter, literal `<strong>` tags and broken image links; the Welcome page stays the template placeholder after `docgen build`.
 - Phase 1 gate needs an outside vibe coder.

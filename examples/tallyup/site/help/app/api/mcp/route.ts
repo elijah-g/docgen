@@ -6,10 +6,8 @@
 // barrel's index.ts reaches config/load.ts's non-literal dynamic `import()`, which breaks
 // bundling a route handler that pulls it in, even transitively.
 import { createDocgenMcpServer, getPageFromLlmsTxt, type DocgenMcpSource } from "docgen/dist/mcp/index.js";
-import type { Procedure } from "docgen/dist/procedures/index.js";
-import type { SearchIndexEntry } from "docgen/dist/index-search/index.js";
+import { isUnknownVersionError, resolveVersionSource } from "docgen/dist/versions/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export const runtime = "nodejs";
@@ -19,32 +17,10 @@ export const runtime = "nodejs";
 // whatever Next would otherwise do with a dynamic route in a static build.
 const STATIC_EXPORT = process.env.DOCGEN_STATIC_EXPORT === "1";
 
-async function readPublicJson<T>(relPath: string): Promise<T | undefined> {
-  try {
-    const raw = await readFile(join(process.cwd(), "public", relPath), "utf8");
-    return JSON.parse(raw) as T;
-  } catch {
-    return undefined;
-  }
-}
-
-async function readPublicText(relPath: string): Promise<string | undefined> {
-  try {
-    return await readFile(join(process.cwd(), "public", relPath), "utf8");
-  } catch {
-    return undefined;
-  }
-}
-
-async function buildSource(): Promise<DocgenMcpSource> {
-  const [searchIndexEntries, procedures, llmsTxt] = await Promise.all([
-    readPublicJson<SearchIndexEntry[]>("search-index.json"),
-    readPublicJson<Procedure[]>("procedures.json"),
-    readPublicText("llms.txt"),
-  ]);
+function buildSource(searchIndexEntries: import("docgen/dist/index-search/index.js").SearchIndexEntry[], procedures: import("docgen/dist/procedures/index.js").Procedure[], llmsTxt: string | undefined): DocgenMcpSource {
   return {
-    searchIndexEntries: searchIndexEntries ?? [],
-    procedures: procedures ?? [],
+    searchIndexEntries,
+    procedures,
     getPageMarkdown: (slug) => (llmsTxt ? getPageFromLlmsTxt(llmsTxt, slug) : undefined),
   };
 }
@@ -56,15 +32,32 @@ function methodNotSupported(): Response {
   });
 }
 
+function unknownVersionResponse(message: string, availableVersions: string[]): Response {
+  return new Response(JSON.stringify({ error: message, availableVersions }), {
+    status: 400,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 /**
  * Stateless mode (no `sessionIdGenerator`): each request gets a fresh transport + server
  * connected for the duration of that one request. Simpler and sufficient for docgen's four
  * read-only, side-effect-free tools — no session state needs to outlive a single call.
+ *
+ * Versioned docs (build-plan.md M21 step 3): a `?version=<name>` query param picks a frozen
+ * snapshot from `versions.json`; omitted/"latest" means the current build. An unknown name
+ * gets a clear 400 listing every version that does exist, before a server is even built.
  */
 async function handle(request: Request): Promise<Response> {
   if (STATIC_EXPORT) return methodNotSupported();
 
-  const source = await buildSource();
+  const version = new URL(request.url).searchParams.get("version") ?? undefined;
+  const versionSource = resolveVersionSource(join(process.cwd(), "public"), version);
+  if (isUnknownVersionError(versionSource)) {
+    return unknownVersionResponse(versionSource.error, versionSource.availableVersions);
+  }
+
+  const source = buildSource(versionSource.searchIndexEntries, versionSource.procedures, versionSource.llmsTxt);
   const server = createDocgenMcpServer(source);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);

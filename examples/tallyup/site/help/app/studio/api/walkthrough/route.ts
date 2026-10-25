@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { devOnlyGuard } from "../../_lib/dev-only";
 import { assertStudioRequest } from "../../_lib/security";
-import { isSlug, loadWalkthroughById, resolveWalkthroughFile } from "../../_lib/server";
+import { isSlug, loadWalkthroughById, readManifest, resolveWalkthroughFile } from "../../_lib/server";
 
 export async function GET(request: Request) {
   const guard = devOnlyGuard();
@@ -15,7 +15,21 @@ export async function GET(request: Request) {
   try {
     const walkthrough = loadWalkthroughById(id);
     const file = resolveWalkthroughFile(id);
-    return NextResponse.json({ walkthrough, file });
+    // The latest capture manifest, trimmed to what the screenshot editor needs: per-step
+    // resolved boxes (highlights to snap new callouts/blur to, plus the callouts/blur already
+    // pinned) and whether a frame image exists at all. `undefined` (not captured yet) is a
+    // valid, expected state the client already handles (M22: "no captured screenshot yet").
+    const rawManifest = readManifest(id);
+    const manifest = rawManifest && {
+      viewport: rawManifest.viewport,
+      steps: rawManifest.steps.map((s) => ({
+        image: s.doc.image,
+        highlights: s.doc.highlights,
+        callouts: s.doc.callouts ?? [],
+        blur: s.doc.blur ?? [],
+      })),
+    };
+    return NextResponse.json({ walkthrough, file, manifest });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 404 });
   }

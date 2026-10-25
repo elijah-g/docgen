@@ -25,8 +25,7 @@ import {
   type ChatStreamEvent,
   type ResolvedChatConfig,
 } from "docgen/dist/chat/index.js";
-import type { SearchIndexEntry } from "docgen/dist/index-search/index.js";
-import type { Procedure } from "docgen/dist/procedures/index.js";
+import { isUnknownVersionError, resolveVersionSource } from "docgen/dist/versions/index.js";
 
 // Node runtime (not edge): reads public/*.json off disk, and the Anthropic SDK's streaming
 // client needs Node's fetch/stream primitives, not the edge runtime's restricted subset.
@@ -127,16 +126,19 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400, headers });
   }
 
-  const [searchIndexEntries, procedures] = await Promise.all([
-    readJson<SearchIndexEntry[]>("search-index.json"),
-    readJson<Procedure[]>("procedures.json"),
-  ]);
+  // Versioned docs (build-plan.md M21 step 3): `body.version` names a frozen snapshot from
+  // `versions.json`, or is omitted/"latest" for the current build. An unknown name is a clear
+  // 400 listing every version that does exist, not a silent fall-back to latest.
+  const versionSource = resolveVersionSource(join(process.cwd(), "public"), body.version);
+  if (isUnknownVersionError(versionSource)) {
+    return NextResponse.json({ error: versionSource.error, availableVersions: versionSource.availableVersions }, { status: 400, headers });
+  }
 
   const result = await handleChatRequest({
     request: body,
     config: chatConfig,
-    searchIndexEntries: searchIndexEntries ?? [],
-    procedures: procedures ?? [],
+    searchIndexEntries: versionSource.searchIndexEntries,
+    procedures: versionSource.procedures,
     apiKey: process.env.ANTHROPIC_API_KEY,
     clientId: clientIdFor(request, chatConfig.trustProxyHeader),
     onUsage: (usage) => {
@@ -157,5 +159,5 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function GET(): Promise<Response> {
-  return NextResponse.json({ error: "use POST {question, currentPath?, history?}" }, { status: 405 });
+  return NextResponse.json({ error: "use POST {question, currentPath?, history?, version?}" }, { status: 405 });
 }

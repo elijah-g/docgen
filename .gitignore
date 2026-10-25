@@ -26,3 +26,6 @@ examples/**/public/videos/
 # private-app material, kept local only (not in the public repo)
 /reference/
 /examples/emh-check/
+
+# local demos
+/.demo/

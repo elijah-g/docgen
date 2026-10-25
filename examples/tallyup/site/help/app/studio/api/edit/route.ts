@@ -3,20 +3,40 @@
 // small set of actions"). Edits made through the Studio are always `by: "person"`.
 import { NextResponse } from "next/server";
 import {
+  addBlur,
+  addCallout,
   EditLockedError,
   EditValidationError,
+  removeBlur,
+  removeCallout,
   removeStep,
+  reorderCallouts,
   reorderSteps,
   setPageBlock,
   setStepField,
+  updateBlur,
+  updateCallout,
+  type OverlayPatch,
   type StepField,
 } from "docgen/dist/edit/index.js";
+import type { BlurBox, Callout } from "docgen/dist/walkthrough/index.js";
 import { devOnlyGuard } from "../../_lib/dev-only";
 import { assertSlug, pagesDir, pageFileFor, resolveWalkthroughFile } from "../../_lib/server";
 import { assertStudioRequest } from "../../_lib/security";
 
 interface EditBody {
-  action: "setStepField" | "reorderSteps" | "removeStep" | "setPageBlock";
+  action:
+    | "setStepField"
+    | "reorderSteps"
+    | "removeStep"
+    | "setPageBlock"
+    | "addCallout"
+    | "updateCallout"
+    | "removeCallout"
+    | "reorderCallouts"
+    | "addBlur"
+    | "updateBlur"
+    | "removeBlur";
   walkthroughId?: string;
   stepId?: string;
   field?: StepField;
@@ -24,6 +44,10 @@ interface EditBody {
   newOrder?: string[];
   key?: string;
   text?: string;
+  callout?: Callout;
+  blur?: BlurBox;
+  itemId?: string;
+  patch?: OverlayPatch;
 }
 
 export async function POST(request: Request) {
@@ -81,6 +105,52 @@ function dispatch(body: EditBody) {
       const file = pageFileFor(body.walkthroughId);
       if (!file) throw new Error(`no built page for walkthrough "${body.walkthroughId}"`);
       return setPageBlock(file, body.key, body.text, { by: "person", pagesDir: pagesDir() });
+    }
+    case "addCallout": {
+      if (!body.walkthroughId || !body.stepId || !body.callout) throw new Error("addCallout requires walkthroughId, stepId and callout");
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return addCallout(file, body.stepId, body.callout, { by: "person" });
+    }
+    case "updateCallout": {
+      if (!body.walkthroughId || !body.stepId || !body.itemId || !body.patch) {
+        throw new Error("updateCallout requires walkthroughId, stepId, itemId and patch");
+      }
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return updateCallout(file, body.stepId, body.itemId, body.patch, { by: "person" });
+    }
+    case "removeCallout": {
+      if (!body.walkthroughId || !body.stepId || !body.itemId) throw new Error("removeCallout requires walkthroughId, stepId and itemId");
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return removeCallout(file, body.stepId, body.itemId, { by: "person" });
+    }
+    case "reorderCallouts": {
+      if (!body.walkthroughId || !body.stepId || !body.newOrder) throw new Error("reorderCallouts requires walkthroughId, stepId and newOrder");
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return reorderCallouts(file, body.stepId, body.newOrder, { by: "person" });
+    }
+    case "addBlur": {
+      if (!body.walkthroughId || !body.stepId || !body.blur) throw new Error("addBlur requires walkthroughId, stepId and blur");
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return addBlur(file, body.stepId, body.blur, { by: "person" });
+    }
+    case "updateBlur": {
+      if (!body.walkthroughId || !body.stepId || !body.itemId || !body.patch) {
+        throw new Error("updateBlur requires walkthroughId, stepId, itemId and patch");
+      }
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return updateBlur(file, body.stepId, body.itemId, body.patch, { by: "person" });
+    }
+    case "removeBlur": {
+      if (!body.walkthroughId || !body.stepId || !body.itemId) throw new Error("removeBlur requires walkthroughId, stepId and itemId");
+      assertSlug(body.walkthroughId);
+      const file = resolveWalkthroughFile(body.walkthroughId);
+      return removeBlur(file, body.stepId, body.itemId, { by: "person" });
     }
     default:
       throw new Error(`unknown action "${(body as { action?: string }).action}"`);

@@ -2,6 +2,7 @@
   "title": "Help",
   "pages": [
     "index",
+    "...",
     "getting-started",
     "how-do-i",
     "screens-and-settings",
