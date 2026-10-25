@@ -110,6 +110,32 @@ export interface PublishConfig {
 }
 
 /**
+ * `docgen ci` settings (docs/scope.md "Three kinds of change"; build-plan.md M19; decisions #22).
+ */
+export interface CiConfig {
+  /**
+   * Exit non-zero when any affected walkthrough is "broken" (capture failed / a check failed).
+   * Default false — a docs check shouldn't block an app merge unless the repo owner wants it to;
+   * the PR comment still flags broken walkthroughs either way.
+   */
+  failOnBroken?: boolean;
+  /**
+   * Set by `docgen init --ci --claude` when the optional Claude Code GitHub Action workflow
+   * (`.github/workflows/docgen-repair.yml`) is installed — lets the PR comment mention the
+   * `@claude` comment shortcut alongside the local repair command. Decisions #22: CI itself never
+   * calls a model either way.
+   */
+  claudeAction?: boolean;
+  /**
+   * `owner/repo` of a separate docs repo, when the help app and walkthroughs live there instead
+   * of in the app repo (`docgen init --ci --docs-repo <owner/repo>`). Informational here — the
+   * generated workflow's own checkout step is what actually fetches it; this just lets the CLI
+   * describe the setup accurately. Unset: same-repo docs (the default).
+   */
+  docsRepo?: string;
+}
+
+/**
  * `docgen affected` settings (docs/scope.md "Only rebuild what changed" -> "Impact map";
  * build-plan.md M17). `ignore`/`all` extend (never replace) the built-in glob lists in
  * src/impact/glob.ts.
@@ -245,6 +271,8 @@ export interface DocgenConfig {
   chat?: ChatConfig;
   /** `docgen affected` settings; see `ImpactConfig`. */
   impact?: ImpactConfig;
+  /** `docgen ci` settings; see `CiConfig`. */
+  ci?: CiConfig;
 }
 
 /** Settings for the `pdf` build stage / `docgen pdf` command (src/pdf/**). */

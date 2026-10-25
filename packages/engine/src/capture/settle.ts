@@ -12,9 +12,34 @@ export function paint(page: Page): Promise<void> {
 }
 
 /**
+ * Waits for every running CSS animation/transition on the page to finish (or a bounded timeout
+ * to pass), via `document.getAnimations()` — covers a toast mid-fade or a list row still
+ * animating in, which Playwright's own `screenshot({ animations: "disabled" })` doesn't catch
+ * (that option freezes animations at the instant of the screenshot call; it doesn't wait for a
+ * class-toggle-driven transition to actually reach its end state first). Fixes two sub-0.2%
+ * screenshot flaps seen on identical TallyUp code (build-plan.md M19 follow-up): a toast captured
+ * mid-fade, and one list row. Best-effort — never throws, and bounded so one animation that
+ * never settles (an infinite spinner, `animation-iteration-count: infinite`) can't hang capture.
+ */
+export async function waitForAnimations(page: Page, timeoutMs = 2000): Promise<void> {
+  await profileAsync("waitForAnimations", async () => {
+    await page
+      .evaluate((timeout) => {
+        const finishing = document
+          .getAnimations()
+          .filter((a) => a.playState === "running")
+          .map((a) => a.finished.catch(() => {}));
+        if (finishing.length === 0) return Promise.resolve();
+        return Promise.race([Promise.all(finishing), new Promise<void>((r) => setTimeout(r, timeout))]);
+      }, timeoutMs)
+      .catch(() => {});
+  });
+}
+
+/**
  * Waits for the page to go quiet: network idle, skeleton loaders gone, the
- * route-change progress bar gone, then a short settle pause. Matches
- * TallyUp's `settle()`; every wait is best-effort (never throws).
+ * route-change progress bar gone, running animations/transitions settled, then a short settle
+ * pause. Matches TallyUp's `settle()`; every wait is best-effort (never throws).
  */
 export async function settle(page: Page): Promise<void> {
   await profileAsync("settle", async () => {
@@ -41,6 +66,7 @@ export async function settle(page: Page): Promise<void> {
       .catch(() => {});
     await page.waitForTimeout(350);
     await paint(page);
+    await waitForAnimations(page);
   });
 }
 

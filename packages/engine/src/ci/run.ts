@@ -10,9 +10,11 @@ import { computeAffected } from "../impact/index.js";
 import { listWalkthroughs } from "../impact/walkthroughs.js";
 import { buildPage } from "../pages/index.js";
 import { resolveCaptureSettings } from "../config/types.js";
+import { buildDigest } from "../digest/index.js";
 import { captureWalkthroughForCi } from "./capture.js";
 import { diffAgainstBaseline } from "./diff.js";
 import { resolveBaselineLookup, diskBaselineSource, gitBaselineSource, type BaselineSource } from "./baseline.js";
+import { tierForStatus, repairCommandFor, findNewUncoveredRoutes } from "./tiers.js";
 import type { CiResult, CiWalkthroughResult, FailureSummary } from "./types.js";
 
 export interface RunCiOptions {
@@ -41,10 +43,6 @@ export interface RunCiOptions {
 
 function publicDirFor(config: ResolvedConfig): string {
   return config.helpApp ? join(config.helpApp, "public") : config.outDir;
-}
-
-function repairCommandFor(id: string, configPath: string): string {
-  return `claude -p "load the docgen-repair skill and fix the '${id}' walkthrough (--config ${configPath}); its failure report is at .build/${id}/ci/capture/failure.json"`;
 }
 
 function failureSummaryFor(id: string, configPath: string, error: string, step: string | undefined): FailureSummary {
@@ -89,6 +87,7 @@ export async function runCi(opts: RunCiOptions): Promise<CiResult> {
       results.push({
         walkthrough: id,
         status: "failed",
+        tier: tierForStatus("failed"),
         changedSteps: [],
         failure: failureSummaryFor(id, opts.configPath, captured.failure?.error ?? "capture failed", captured.failure?.step),
       });
@@ -102,6 +101,7 @@ export async function runCi(opts: RunCiOptions): Promise<CiResult> {
       results.push({
         walkthrough: id,
         status: "failed",
+        tier: tierForStatus("failed"),
         changedSteps: [],
         failure: failureSummaryFor(id, opts.configPath, (err as Error).message.split("\n")[0], undefined),
       });
@@ -111,6 +111,7 @@ export async function runCi(opts: RunCiOptions): Promise<CiResult> {
       results.push({
         walkthrough: id,
         status: "failed",
+        tier: tierForStatus("failed"),
         changedSteps: [],
         failure: failureSummaryFor(id, opts.configPath, page.problems[0] ?? "capture validation failed", undefined),
       });
@@ -127,16 +128,35 @@ export async function runCi(opts: RunCiOptions): Promise<CiResult> {
     );
 
     if (changedSteps === undefined) {
-      results.push({ walkthrough: id, status: "new", changedSteps: [] });
+      results.push({ walkthrough: id, status: "new", tier: tierForStatus("new"), changedSteps: [] });
     } else if (changedSteps.length === 0) {
-      results.push({ walkthrough: id, status: "unchanged", changedSteps: [] });
+      results.push({ walkthrough: id, status: "unchanged", tier: tierForStatus("unchanged"), changedSteps: [] });
     } else {
-      results.push({ walkthrough: id, status: "changed", changedSteps });
+      results.push({ walkthrough: id, status: "changed", tier: tierForStatus("changed"), changedSteps });
     }
   }
 
   const currentIds = new Set(walkthroughEntries.map((w) => w.id));
   const stalePages = source.listWalkthroughIds().filter((id) => !currentIds.has(id));
+
+  let newRoutes: CiResult["newRoutes"] = [];
+  try {
+    const headDigest = buildDigest(appRepo, { app: config.impact?.app });
+    if (!headDigest.apps || headDigest.apps.length === 0) {
+      newRoutes = findNewUncoveredRoutes({
+        appRepo,
+        base: opts.base,
+        head,
+        routes: headDigest.routes,
+        walkthroughs: walkthroughEntries,
+        configPath: opts.configPath,
+      });
+    }
+  } catch {
+    // Best-effort: an ambiguous monorepo, a shallow clone, or a missing base ref shouldn't fail
+    // the whole CI run over the "new" tier — cosmetic/broken results above are the load-bearing
+    // part of `docgen ci`.
+  }
 
   return {
     base: opts.base,
@@ -145,6 +165,7 @@ export async function runCi(opts: RunCiOptions): Promise<CiResult> {
     all: affected.all,
     allReason: affected.reason,
     results,
+    newRoutes,
     stalePages,
     outDir,
   };

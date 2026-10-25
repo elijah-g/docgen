@@ -58,6 +58,29 @@ describe("writeDocgenConfig", () => {
     expect(content).toMatch(/helpApp:\s*"\."/);
   });
 
+  it("writes config.ci.claudeAction/docsRepo when the matching --ci flags were used (build-plan.md M19)", () => {
+    const dir = tmpDir();
+    const result = writeDocgenConfig({
+      destDir: dir,
+      appUrl: "http://127.0.0.1:3100",
+      brand: {},
+      detected: detectedNext,
+      ci: { claudeAction: true, docsRepo: "acme/docgen-docs" },
+    });
+
+    const content = readFileSync(result.file, "utf8");
+    expect(content).toMatch(/ci:\s*\{/);
+    expect(content).toContain("claudeAction: true");
+    expect(content).toContain('docsRepo: "acme/docgen-docs"');
+  });
+
+  it("omits the ci block entirely when neither flag was used", () => {
+    const dir = tmpDir();
+    const result = writeDocgenConfig({ destDir: dir, appUrl: "http://127.0.0.1:3100", brand: {}, detected: detectedNext, ci: {} });
+    const content = readFileSync(result.file, "utf8");
+    expect(content).not.toMatch(/\bci:\s*\{/);
+  });
+
   it("never overwrites an existing docgen.config.ts", () => {
     const dir = tmpDir();
     const file = join(dir, "docgen.config.ts");

@@ -1,6 +1,6 @@
 ---
 name: docgen-write
-description: Write one walkthrough's YAML from an approved outline card, in plain words using on-screen names, then validate and capture it. Runs as one subagent per walkthrough, in parallel with others. Use after docgen-plan's outline is approved, or when a person asks to change one specific walkthrough's steps or wording.
+description: Write one walkthrough's YAML from an approved outline card, in plain words using on-screen names, then validate and capture it. Runs as one subagent per walkthrough, in parallel with others. Use after docgen-plan's outline is approved, when a person asks to change one specific walkthrough's steps or wording, or when docgen ci flags a new route no walkthrough covers (tier "new") with its exact draft command.
 ---
 
 # docgen-write
@@ -16,7 +16,10 @@ shared app/db, so capture itself must never run from two subagents at once (see 
 0. Run `docgen catch-up --since last` before anything else — it lists edits a person made in the
    Studio since this skill last looked, so a rewrite never clobbers a change made since.
 1. Start from the approved outline card (title, reader, one-line purpose) and the relevant slice
-   of the discover summary (routes/labels for that task only).
+   of the discover summary (routes/labels for that task only) — or, when run from `docgen ci`'s
+   "new" tier comment, from the route path and file it named directly; there's no outline card for
+   this case, just one new page to cover. Either way, label the PR `docs:new` when you're done
+   (decisions #24) — the reviewer `docgen ci`'s comment names is the app PR's author.
 2. **Before writing any step**, run `docgen inspect <path> --config <cfg> --json` on the
    walkthrough's start page, and again on every page a step navigates to — never guess a role,
    name, or option label from memory or from reading the app's source. It opens that one page

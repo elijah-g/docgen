@@ -7,7 +7,7 @@ import { detectFramework } from "../init/detect.js";
 import { extractBrand } from "../init/brand.js";
 import { copyTemplate } from "../init/copy-template.js";
 import { writeDocgenConfig } from "../init/write-config.js";
-import { writeCiWorkflow } from "../init/ci.js";
+import { writeCiWorkflow, writeClaudeRepairWorkflow } from "../init/ci.js";
 import type { BrandConfig } from "../config/types.js";
 
 export interface InitOptions {
@@ -26,6 +26,16 @@ export interface InitOptions {
   ciStartCommand?: string;
   /** `--ci`'s `uses:` line for the docgen action. Default "elijah-g/docgen@main" (decisions #25). */
   ciUses?: string;
+  /** Also writes `.github/workflows/docgen-repair.yml` (build-plan.md M19 item 2) — opt-in Claude
+   * Code repair on an `@claude` comment or the `docs:repair` label. Requires `ci`. */
+  ciClaude?: boolean;
+  /** `--claude`'s trigger phrase. Default "@claude". */
+  ciClaudeTriggerPhrase?: string;
+  /** `--claude`'s label trigger. Default "docs:repair". */
+  ciClaudeLabel?: string;
+  /** `owner/repo` of a separate docs repo (build-plan.md M19 item 3) — sets `config.ci.docsRepo`
+   * and has the generated workflow check it out to `.docgen-docs` with `DOCGEN_DOCS_TOKEN`. */
+  ciDocsRepo?: string;
 }
 
 export interface InitResult {
@@ -38,6 +48,7 @@ export interface InitResult {
   skipped: string[];
   config: { file: string; written: boolean };
   ci?: { file: string; written: boolean };
+  claudeRepair?: { file: string; written: boolean };
 }
 
 export function runInitCommand(options: InitOptions): InitResult {
@@ -57,16 +68,26 @@ export function runInitCommand(options: InitOptions): InitResult {
     appUrl: options.appUrl ?? "http://localhost:3000",
     brand,
     detected,
+    ci: options.ci ? { claudeAction: options.ciClaude, docsRepo: options.ciDocsRepo } : undefined,
   });
 
   let ci: { file: string; written: boolean } | undefined;
+  let claudeRepair: { file: string; written: boolean } | undefined;
   if (options.ci) {
     ci = writeCiWorkflow({
       appRepo: appRepoDir,
-      configPath: `${relative(appRepoDir, destDir)}/docgen.config.ts`,
+      configPath: options.ciDocsRepo ? undefined : `${relative(appRepoDir, destDir)}/docgen.config.ts`,
       startCommand: options.ciStartCommand,
       uses: options.ciUses,
+      docsRepo: options.ciDocsRepo,
     });
+    if (options.ciClaude) {
+      claudeRepair = writeClaudeRepairWorkflow({
+        appRepo: appRepoDir,
+        triggerPhrase: options.ciClaudeTriggerPhrase,
+        labelTrigger: options.ciClaudeLabel,
+      });
+    }
   }
 
   return {
@@ -79,6 +100,7 @@ export function runInitCommand(options: InitOptions): InitResult {
     skipped,
     config,
     ci,
+    claudeRepair,
   };
 }
 
@@ -115,6 +137,9 @@ export function runInit(options: InitOptions, json: boolean): number {
   console.log(result.config.written ? `  wrote ${result.config.file}` : `  left existing ${result.config.file} untouched`);
   if (result.ci) {
     console.log(result.ci.written ? `  wrote ${result.ci.file}` : `  left existing ${result.ci.file} untouched`);
+  }
+  if (result.claudeRepair) {
+    console.log(result.claudeRepair.written ? `  wrote ${result.claudeRepair.file}` : `  left existing ${result.claudeRepair.file} untouched`);
   }
   return 0;
 }

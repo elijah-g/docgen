@@ -16,7 +16,7 @@ import { runBuild } from "./commands/build.js";
 import { runVoiceCommand } from "./commands/voice.js";
 import { runDigest } from "./commands/digest.js";
 import { runAffected } from "./commands/affected.js";
-import { runCiCli } from "./commands/ci.js";
+import { runCiCli, runCiPublishCli } from "./commands/ci.js";
 import { runVersionFreeze, runVersionList } from "./commands/version.js";
 import { runWhatsNew } from "./commands/whats-new.js";
 import { runSkillsInstall } from "./commands/skills.js";
@@ -374,17 +374,43 @@ program
   .description("scaffold the help app template into <dir>/help, detecting the app's framework, routes and brand")
   .option("--app-repo <path>", "app repo to detect framework/routes/brand from (default: <dir>)")
   .option("--app <path>", "app directory within a workspace monorepo (e.g. apps/web) — required when several Next.js apps are found")
-  .option("--ci", "also write .github/workflows/docgen.yml (PR check with screenshot diffs)")
+  .option("--ci", "also write .github/workflows/docgen.yml (PR check with screenshot diffs, publish-on-merge)")
   .option("--ci-start-command <cmd>", "command that starts the app in CI (default: npm run dev)")
   .option("--ci-uses <ownerRepoAtRef>", "the docgen action to use (default: elijah-g/docgen@main)")
+  .option("--claude", "also write .github/workflows/docgen-repair.yml: opt-in Claude Code repair on an @claude comment or the docs:repair label (requires --ci)")
+  .option("--claude-trigger-phrase <phrase>", "--claude's PR-comment trigger phrase (default: @claude)")
+  .option("--claude-label <label>", "--claude's label trigger (default: docs:repair)")
+  .option("--docs-repo <ownerRepo>", "walkthroughs/help app live in a separate repo — the workflow checks it out to .docgen-docs with secrets.DOCGEN_DOCS_TOKEN (requires --ci)")
   .option("--json", "print a single JSON object instead of a summary")
   .action(
     (
       dir: string | undefined,
-      opts: { appRepo?: string; app?: string; ci?: boolean; ciStartCommand?: string; ciUses?: string; json?: boolean },
+      opts: {
+        appRepo?: string;
+        app?: string;
+        ci?: boolean;
+        ciStartCommand?: string;
+        ciUses?: string;
+        claude?: boolean;
+        claudeTriggerPhrase?: string;
+        claudeLabel?: string;
+        docsRepo?: string;
+        json?: boolean;
+      },
     ) => {
       process.exitCode = runInit(
-        { dir, appRepo: opts.appRepo, app: opts.app, ci: opts.ci, ciStartCommand: opts.ciStartCommand, ciUses: opts.ciUses },
+        {
+          dir,
+          appRepo: opts.appRepo,
+          app: opts.app,
+          ci: opts.ci,
+          ciStartCommand: opts.ciStartCommand,
+          ciUses: opts.ciUses,
+          ciClaude: opts.claude,
+          ciClaudeTriggerPhrase: opts.claudeTriggerPhrase,
+          ciClaudeLabel: opts.claudeLabel,
+          ciDocsRepo: opts.docsRepo,
+        },
         Boolean(opts.json),
       );
     },
@@ -402,6 +428,10 @@ program
   .option("--baseline <source>", "where before-screenshots come from: disk (help app, default) or git (at --base)")
   .option("--fork-pr", "PR comes from a fork (read-only token): skip push and comment, write an artifact")
   .option("--dry-run", "write the comment and images to a local dir instead of GitHub")
+  .option(
+    "--publish",
+    "merge-behaviour hook (build-plan.md M19): re-capture and republish what --base..--head affected into the help app, no PR/comment — run this on push to main",
+  )
   .option("--json", "print a single JSON object instead of a summary")
   .action(
     async (opts: {
@@ -414,8 +444,16 @@ program
       baseline?: string;
       forkPr?: boolean;
       dryRun?: boolean;
+      publish?: boolean;
       json?: boolean;
     }) => {
+      if (opts.publish) {
+        process.exitCode = await runCiPublishCli(
+          { configPath: opts.config, base: opts.base, head: opts.head, appUrl: opts.appUrl, appRepo: opts.appRepo },
+          Boolean(opts.json),
+        );
+        return;
+      }
       if (opts.baseline && opts.baseline !== "disk" && opts.baseline !== "git") {
         console.error(`--baseline must be "disk" or "git", got "${opts.baseline}"`);
         process.exitCode = 2;

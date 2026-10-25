@@ -17,9 +17,13 @@ the problem is likely a real planning question (the task changed shape), not a l
 Read exactly what the engine's capture step writes — the failing step's id, the error, and a
 trimmed accessibility snapshot of the page at the point of failure, from `failure.json` in the
 capture dir (`.build/<id>/capture/failure.json`, the same trimmed `FailureReport` `docgen capture
---json` prints). Then run one `docgen inspect` on the failing page, scoped with `--area` where
-the failure report already points (step 2 below) — its ~80-line cap is the only other read this
-skill does. Never the full page HTML, console log, video, or the rest of the app.
+--json` prints). When `docgen ci` flagged the walkthrough as broken, its PR comment and repair
+command give the exact path instead — it's `.build/<id>/ci/capture/failure.json` there (a
+separate capture dir from local `docgen capture`, so a CI run never clobbers a person's own last
+local capture) — use the path the comment/command gives, not the default above. Then run one
+`docgen inspect` on the failing page, scoped with `--area` where the failure report already
+points (step 2 below) — its ~80-line cap is the only other read this skill does. Never the full
+page HTML, console log, video, or the rest of the app.
 
 ## How
 

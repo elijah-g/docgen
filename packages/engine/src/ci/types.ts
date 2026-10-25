@@ -17,6 +17,18 @@ export interface ChangedStep {
 
 export type WalkthroughCiStatus = "unchanged" | "changed" | "failed" | "new";
 
+/**
+ * docs/scope.md "Three kinds of change" (decisions #8, #22); build-plan.md M19. Deterministic
+ * from `WalkthroughCiStatus` (see `ci/tiers.ts`'s `tierForStatus`) plus the separate
+ * `CiResult.newRoutes` list for app screens no walkthrough covers at all yet:
+ *   - "cosmetic": capture passed (status "unchanged"/"changed"/"new" — "new" here means a
+ *     walkthrough with no baseline yet, so there's nothing to compare, not "undocumented route").
+ *     Refreshes and publishes on merge; nobody is asked.
+ *   - "broken": capture failed (status "failed") — flagged with the repair command.
+ *   - "new": not a per-walkthrough tier at all — see `NewRouteResult` below.
+ */
+export type ChangeTier = "cosmetic" | "broken";
+
 export interface FailureSummary {
   /** First line of the capture failure's error, plus step/action — never the full snapshot/log
    * (docs/scope.md "trimmed failure report"). */
@@ -28,8 +40,25 @@ export interface FailureSummary {
 export interface CiWalkthroughResult {
   walkthrough: string;
   status: WalkthroughCiStatus;
+  /** docs/scope.md "Three kinds of change" tier for this walkthrough — see `ChangeTier`. */
+  tier: ChangeTier;
   changedSteps: ChangedStep[];
   failure?: FailureSummary;
+}
+
+/**
+ * A page route added in this diff that no walkthrough's manifest visits — the "new" tier
+ * (docs/scope.md "Three kinds of change"; build-plan.md M19). Listed separately from
+ * `CiWalkthroughResult` because there's no walkthrough yet to attach a result to.
+ */
+export interface NewRouteResult {
+  /** Route path, e.g. "/dashboard/teams/[id]". */
+  path: string;
+  /** File path relative to the scanned app root, e.g. "app/dashboard/teams/[id]/page.tsx". */
+  file: string;
+  /** Exact command to run locally in Claude Code to draft a walkthrough for this route
+   * (the docgen-write skill), labelled `docs:new` (decisions #24). */
+  draftCommand: string;
 }
 
 export interface CiResult {
@@ -43,6 +72,8 @@ export interface CiResult {
   all: boolean;
   allReason?: string;
   results: CiWalkthroughResult[];
+  /** New page routes in this diff that no walkthrough covers yet — the "new" tier. */
+  newRoutes: NewRouteResult[];
   /** Walkthrough ids with a published page at `base` that no longer exist in
    * `config.walkthroughsDir` at `head`. */
   stalePages: string[];

@@ -5,5 +5,5 @@ export { copyTemplate, TEMPLATE_DIR } from "./copy-template.js";
 export type { CopyTemplateResult } from "./copy-template.js";
 export { writeDocgenConfig } from "./write-config.js";
 export type { WriteConfigOptions, WriteConfigResult } from "./write-config.js";
-export { writeCiWorkflow } from "./ci.js";
-export type { WriteCiWorkflowOptions, WriteCiWorkflowResult } from "./ci.js";
+export { writeCiWorkflow, writeClaudeRepairWorkflow } from "./ci.js";
+export type { WriteCiWorkflowOptions, WriteCiWorkflowResult, WriteClaudeRepairWorkflowOptions, WriteClaudeRepairWorkflowResult } from "./ci.js";

@@ -77,10 +77,35 @@ describe("writeCiWorkflow", () => {
     const result = writeCiWorkflow({ appRepo });
     const content = readFileSync(result.file, "utf8");
     expect(content).toContain("permissions: {}");
-    const usesLines = content.split("\n").filter((l) => l.includes("uses:"));
+    const usesLines = content.split("\n").filter((l) => l.trimStart().startsWith("uses:"));
     expect(usesLines.length).toBeGreaterThan(0);
     for (const line of usesLines) {
       expect(line).toMatch(/@(v\d+|main)\b/);
     }
+  });
+
+  it("adds a docgen-publish job on push to main that doesn't run for PRs", () => {
+    const appRepo = tmpDir();
+    const result = writeCiWorkflow({ appRepo });
+    const content = readFileSync(result.file, "utf8");
+    expect(content).toContain("push:");
+    expect(content).toContain("branches: [main]");
+    expect(content).toContain("docgen-publish:");
+    expect(content).toContain("github.event_name == 'push'");
+    expect(content).toContain("ci --publish");
+    // The PR-check and prune jobs must stay scoped to pull_request — a push event has no
+    // github.event.pull_request/.action at all, so "if" guards need the event_name check too.
+    expect(content).toContain("github.event_name == 'pull_request' && github.event.action != 'closed'");
+    expect(content).toContain("github.event_name == 'pull_request' && github.event.action == 'closed'");
+  });
+
+  it("checks out a separate docs repo with DOCGEN_DOCS_TOKEN when --docs-repo is set, and points config there", () => {
+    const appRepo = tmpDir();
+    const result = writeCiWorkflow({ appRepo, docsRepo: "acme/docgen-docs" });
+    const content = readFileSync(result.file, "utf8");
+    expect(content).toContain("repository: acme/docgen-docs");
+    expect(content).toContain("path: .docgen-docs");
+    expect(content).toContain("secrets.DOCGEN_DOCS_TOKEN");
+    expect(content).toContain("config: .docgen-docs/help/docgen.config.ts");
   });
 });

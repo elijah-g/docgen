@@ -71,6 +71,7 @@ through its isolated demo environment).
 | `qa` | Loudness, black frames, caption timing, personal-data and secret scans |
 | `build` | All of the above in order, skipping unchanged work; writes `report.json` |
 | `affected` | Map a git diff to the walkthroughs it touches; unknown changes mean all |
+| `ci` | PR check: affected walkthroughs, capture, screenshot diff, one PR comment tiered cosmetic/broken/new (no model, no API keys); `--publish` republishes on merge |
 | `version freeze`, `version list`, `whats-new` | Freeze a docs version per release; write the What's new page from merged PRs |
 | `edit`, `undo`, `catch-up` | The same edits the Studio makes, with history marked person or agent, and locks |
 | `publish` | Deploy to `vercel`, `netlify`, `amplify`, `cloudflare`, `node` or `static`; first production publish needs a person's OK |
@@ -86,6 +87,16 @@ through its isolated demo environment).
   personal data and secrets before it publishes.
 - Demo data uses example.com and reserved fictional phone ranges.
 - Agents can't approve the first production publish; a person has to.
+
+## Keeping docs current in CI
+
+`docgen init --ci` writes a GitHub Action (`.github/workflows/docgen.yml`) that maps a PR's diff
+to the walkthroughs it touches, re-captures them, diffs the screenshots, and posts one PR comment
+tiered **cosmetic** (refreshes and publishes on merge, nobody's asked), **broken** (the exact
+`docgen-repair` command to run locally), or **new** (a route no walkthrough covers yet, with the
+`docgen-write` command and the `docs:new` label). No model, no API key, ever, in this base
+workflow — see [docs/ci.md](docs/ci.md) for the full setup, the optional Claude Code repair
+Action (`--claude`), and the separate-docs-repo option (`--docs-repo <owner/repo>`).
 
 ## Agent skills
 

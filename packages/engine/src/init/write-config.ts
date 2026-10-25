@@ -13,6 +13,10 @@ export interface WriteConfigOptions {
   appUrl: string;
   brand: BrandConfig;
   detected: DetectResult;
+  /** Set when `docgen init --ci --claude`/`--docs-repo` wrote the matching workflow(s) — mirrors
+   * that into `config.ci` so `docgen ci`'s own comment text and exit-code defaults line up with
+   * what the workflow actually does (build-plan.md M19). */
+  ci?: { claudeAction?: boolean; docsRepo?: string };
 }
 
 export interface WriteConfigResult {
@@ -25,6 +29,14 @@ function brandBlock(brand: BrandConfig): string {
   if (fields.length === 0) return "";
   const lines = fields.map(([k, v]) => `    ${k}: ${JSON.stringify(v)},`);
   return `  brand: {\n${lines.join("\n")}\n  },\n`;
+}
+
+function ciBlock(ci: WriteConfigOptions["ci"]): string {
+  if (!ci || (!ci.claudeAction && !ci.docsRepo)) return "";
+  const lines: string[] = [];
+  if (ci.claudeAction) lines.push("    claudeAction: true,");
+  if (ci.docsRepo) lines.push(`    docsRepo: ${JSON.stringify(ci.docsRepo)},`);
+  return `  ci: {\n${lines.join("\n")}\n  },\n`;
 }
 
 function routesComment(detected: DetectResult): string {
@@ -61,7 +73,7 @@ export default defineConfig({
   // This help app is its own target: the index stage mirrors built pages into
   // its own content/docs + public/ so the help site actually shows them.
   helpApp: ".",
-${brandBlock(opts.brand)}});
+${brandBlock(opts.brand)}${ciBlock(opts.ci)}});
 `;
 
   mkdirSync(dirname(file), { recursive: true });

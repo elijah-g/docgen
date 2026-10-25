@@ -10,6 +10,7 @@ import type { CiResult } from "../ci/types.js";
 import { buildCommentMarkdown } from "../ci/comment.js";
 import { resolveOwnerRepo, pushPreviewImages, upsertPrComment, rawGithubImageUrls, type FetchFn } from "../ci/github.js";
 import { createNodeCommandRunner } from "../ci/runner.js";
+import { runCiPublish, type CiPublishResult } from "../ci/publish.js";
 
 export interface RunCiCommandOptions {
   configPath: string;
@@ -48,7 +49,7 @@ export interface CiCommandResult {
 /** Writes the comment markdown + every image it references into `<ci.outDir>/comment/` instead
  * of calling GitHub — used by `--dry-run` and by the fork-PR / push-failure fallback, so a fork
  * PR still gets its diff as a downloadable Actions artifact instead of silently nothing. */
-function writeLocalArtifact(ci: CiResult, prNumber: number | undefined): { comment: string; dir: string } {
+function writeLocalArtifact(ci: CiResult, prNumber: number | undefined, claudeActionInstalled = false): { comment: string; dir: string } {
   const localDir = join(ci.outDir, "comment");
   mkdirSync(localDir, { recursive: true });
   const images = {
@@ -63,11 +64,14 @@ function writeLocalArtifact(ci: CiResult, prNumber: number | undefined): { comme
       return dest;
     },
   };
-  const comment = buildCommentMarkdown(ci, images, { prNumber });
+  const comment = buildCommentMarkdown(ci, images, { prNumber, claudeActionInstalled });
   writeFileSync(join(localDir, "comment.md"), comment);
   return { comment, dir: localDir };
 }
 
+/** Exit non-zero over a broken walkthrough only when the repo owner opted in (`config.ci.failOnBroken`,
+ * default false — docs/scope.md "Three kinds of change": a docs check shouldn't block an app
+ * merge unless its owner wants it to). The PR comment flags broken walkthroughs either way. */
 export async function runCiCommand(opts: RunCiCommandOptions): Promise<CiCommandResult> {
   const runOpts: RunCiOptions = {
     configPath: opts.configPath,
@@ -80,23 +84,26 @@ export async function runCiCommand(opts: RunCiCommandOptions): Promise<CiCommand
     dryRun: opts.dryRun,
   };
   const ci = await runCi(runOpts);
-  const anyBroken = ci.results.some((r) => r.status === "failed");
+  const config = await loadConfig(opts.configPath);
+  const anyBroken = ci.results.some((r) => r.tier === "broken");
+  const failOnBroken = config.ci?.failOnBroken ?? false;
+  const ok = !failOnBroken || !anyBroken;
+  const claudeActionInstalled = config.ci?.claudeAction ?? false;
 
   if (opts.dryRun) {
-    const { comment } = writeLocalArtifact(ci, opts.prNumber);
-    return { ci, comment, commentAction: "dry-run", ok: !anyBroken };
+    const { comment } = writeLocalArtifact(ci, opts.prNumber, claudeActionInstalled);
+    return { ci, comment, commentAction: "dry-run", ok };
   }
 
   if (!opts.prNumber) {
-    return { ci, ok: !anyBroken, error: anyBroken ? "one or more walkthroughs broke" : undefined };
+    return { ci, ok, error: anyBroken && failOnBroken ? "one or more walkthroughs broke" : undefined };
   }
 
   if (opts.forkPr) {
-    const { comment, dir } = writeLocalArtifact(ci, opts.prNumber);
-    return { ci, comment, commentAction: "artifact", artifactDir: dir, ok: !anyBroken };
+    const { comment, dir } = writeLocalArtifact(ci, opts.prNumber, claudeActionInstalled);
+    return { ci, comment, commentAction: "artifact", artifactDir: dir, ok };
   }
 
-  const config = await loadConfig(opts.configPath);
   const appRepo = opts.appRepo ?? config.impact?.appRepo ?? process.cwd();
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
@@ -109,19 +116,50 @@ export async function runCiCommand(opts: RunCiCommandOptions): Promise<CiCommand
   try {
     const pushed = await pushPreviewImages(ci, { ownerRepo, token, prNumber: opts.prNumber, runner, cloneUrl });
     const images = rawGithubImageUrls(ownerRepo, "docgen-previews", pushed.sha, pushed.prefix, ci.outDir);
-    const comment = buildCommentMarkdown(ci, images, { prNumber: opts.prNumber });
+    const comment = buildCommentMarkdown(ci, images, { prNumber: opts.prNumber, claudeActionInstalled });
 
     const fetchImpl = opts.fetchImpl ?? (fetch as unknown as FetchFn);
     const result = await upsertPrComment(ownerRepo, opts.prNumber, comment, token, fetchImpl);
 
-    return { ci, comment, commentAction: result.action, ok: !anyBroken };
+    return { ci, comment, commentAction: result.action, ok };
   } catch (err) {
     // Second line of defence: a read-only token (fork PR we didn't know about, branch
     // protection, a revoked token) 403s the push or the comment — fall back to the same local
     // artifact a declared fork PR gets, rather than failing the whole check over a comment.
-    const { comment, dir } = writeLocalArtifact(ci, opts.prNumber);
-    return { ci, comment, commentAction: "artifact", artifactDir: dir, ok: !anyBroken, error: `GitHub push/comment failed, fell back to artifact: ${(err as Error).message.split("\n")[0]}` };
+    const { comment, dir } = writeLocalArtifact(ci, opts.prNumber, claudeActionInstalled);
+    return { ci, comment, commentAction: "artifact", artifactDir: dir, ok, error: `GitHub push/comment failed, fell back to artifact: ${(err as Error).message.split("\n")[0]}` };
   }
+}
+
+export interface RunCiPublishCommandOptions {
+  configPath: string;
+  base: string;
+  head?: string;
+  appUrl?: string;
+  appRepo?: string;
+}
+
+/** `docgen ci --publish` — the merge-behaviour hook (build-plan.md M19): re-captures and
+ * republishes whatever a push to main affected. No PR, no comment, no GitHub API call — the
+ * generated workflow commits the result itself with its own `GITHUB_TOKEN`. */
+export async function runCiPublishCli(opts: RunCiPublishCommandOptions, json: boolean): Promise<number> {
+  let result: CiPublishResult;
+  try {
+    result = await runCiPublish(opts);
+  } catch (err) {
+    const message = err instanceof Error ? err.message.split("\n")[0] : String(err);
+    if (json) console.log(JSON.stringify({ ok: false, error: message }));
+    else console.error(`ci --publish failed: ${message}`);
+    return 1;
+  }
+
+  if (json) {
+    console.log(JSON.stringify(result));
+    return result.ok ? 0 : 1;
+  }
+
+  console.log(`docgen ci --publish — ${result.published.length} published${result.failed.length > 0 ? `, ${result.failed.length} failed (${result.failed.join(", ")})` : ""}`);
+  return result.ok ? 0 : 1;
 }
 
 export async function runCiCli(opts: RunCiCommandOptions, json: boolean): Promise<number> {
