@@ -13,7 +13,7 @@ import type { ChatConfig, ModelTiers } from "../config/index.js";
 export const DEFAULT_CHAT_CONFIG: ResolvedChatConfig = {
   model: "claude-haiku-4-5",
   allowedOrigins: [],
-  retrievalLimit: 5,
+  retrievalLimit: 4,
   maxInputTokens: 8000,
   maxOutputTokens: 1024,
   unansweredScoreThreshold: 0.01,
@@ -28,6 +28,7 @@ export function resolveChatConfig(chat: ChatConfig | undefined, models: ModelTie
   return {
     model: chat?.model ?? models?.fast ?? DEFAULT_CHAT_CONFIG.model,
     supportContact: chat?.supportContact,
+    appName: chat?.appName,
     allowedOrigins: chat?.allowedOrigins ?? DEFAULT_CHAT_CONFIG.allowedOrigins,
     retrievalLimit: chat?.retrievalLimit ?? DEFAULT_CHAT_CONFIG.retrievalLimit,
     maxInputTokens: chat?.maxInputTokens ?? DEFAULT_CHAT_CONFIG.maxInputTokens,
@@ -45,7 +46,23 @@ export type ChatHandlerResult =
   | { status: 400; body: { error: string } }
   | { status: 200; stream: AsyncIterable<ChatStreamEvent> };
 
-const DONT_KNOW_PHRASES = ["i don't know", "i do not know", "i'm not sure", "not covered in"];
+const DONT_KNOW_PHRASES = [
+  "i don't know",
+  "i do not know",
+  "i'm not sure",
+  "not covered in",
+  "don't cover",
+  "doesn't cover",
+  "don't have information",
+];
+
+/** Greetings and thanks ("hi", "thanks!", "good morning") — answered without sources and never
+ * logged as unanswered, since there's nothing for the docs to cover. */
+const SMALL_TALK = /^(hi|hello|hey|hiya|g'?day|yo|thanks|thank you|thx|cheers|ok|okay|great|good (morning|afternoon|evening))( there| so much| very much| heaps)?[\s!.,:)]*$/i;
+
+export function isSmallTalk(question: string): boolean {
+  return SMALL_TALK.test(question.trim());
+}
 
 // One limiter per process per configured rate (build-plan.md M15 step 4: "per-IP simple rate
 // limit in memory") — reused across requests so each client's bucket actually persists, but
@@ -86,10 +103,13 @@ export async function handleChatRequest(opts: ChatHandlerOptions): Promise<ChatH
     return { status: 429, body: { error: "too many requests — try again in a minute" } };
   }
 
-  const context = retrieve(opts.request.question, opts.searchIndexEntries, opts.procedures, {
-    currentPath: opts.request.currentPath,
-    limit: opts.config.retrievalLimit,
-  });
+  const smallTalk = isSmallTalk(opts.request.question);
+  const context = smallTalk
+    ? { pages: [], topScore: 0 }
+    : retrieve(opts.request.question, opts.searchIndexEntries, opts.procedures, {
+        currentPath: opts.request.currentPath,
+        limit: opts.config.retrievalLimit,
+      });
   const citations = buildCitations(context);
   const assembled = assembleRequest(
     opts.config.supportContact,
@@ -98,6 +118,7 @@ export async function handleChatRequest(opts: ChatHandlerOptions): Promise<ChatH
     opts.request.question,
     opts.request.history,
     opts.config.maxInputTokens,
+    opts.config.appName,
   );
 
   const client: AnthropicChatClient = (opts.anthropicClient as AnthropicChatClient | undefined) ?? new RealAnthropicChatClient(opts.apiKey);
@@ -105,22 +126,26 @@ export async function handleChatRequest(opts: ChatHandlerOptions): Promise<ChatH
 
   const unansweredStore = opts.unansweredStore ?? defaultUnansweredStore();
   const onUsage = opts.onUsage;
-  const belowThreshold = context.topScore < opts.config.unansweredScoreThreshold;
+  const belowThreshold = !smallTalk && context.topScore < opts.config.unansweredScoreThreshold;
 
   async function* events(): AsyncIterable<ChatStreamEvent> {
     yield {
       type: "meta",
       citations,
-      ...(context.procedure
-        ? {
-            procedure: {
-              id: context.procedure.id,
-              title: context.procedure.title,
-              firstScreenshot: context.procedure.steps[0]?.screenshot,
-              firstVideoTimeSec: context.procedure.steps[0]?.videoTimeSec,
-            },
-          }
-        : {}),
+      procedures: context.pages.flatMap((page) =>
+        page.procedure
+          ? [
+              {
+                id: page.procedure.id,
+                title: page.procedure.title,
+                url: page.url,
+                stepCount: page.procedure.steps.length,
+                firstScreenshot: page.procedure.steps[0]?.screenshot,
+                firstVideoTimeSec: page.procedure.steps[0]?.videoTimeSec,
+              },
+            ]
+          : [],
+      ),
     };
 
     let answer = "";
@@ -134,7 +159,7 @@ export async function handleChatRequest(opts: ChatHandlerOptions): Promise<ChatH
       return;
     }
 
-    const saidDontKnow = DONT_KNOW_PHRASES.some((p) => answer.toLowerCase().includes(p));
+    const saidDontKnow = !smallTalk && DONT_KNOW_PHRASES.some((p) => answer.toLowerCase().includes(p));
     const unanswered = belowThreshold || saidDontKnow;
     if (unanswered) {
       await unansweredStore.record({ question: opts.request.question, path: opts.request.currentPath, at: new Date().toISOString() });

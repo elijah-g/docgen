@@ -7,18 +7,20 @@
 // aren't React.
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChatMarkdown, citedNumbers } from "./markdown";
 
 interface Citation {
   n: number;
   url: string;
   title: string;
-  heading?: string;
 }
 
 interface ProcedureMeta {
   id: string;
   title: string;
+  url: string;
+  stepCount: number;
   firstScreenshot?: string;
   firstVideoTimeSec?: number;
 }
@@ -27,8 +29,10 @@ interface Turn {
   role: "user" | "assistant";
   text: string;
   citations?: Citation[];
-  procedure?: ProcedureMeta;
+  procedures?: ProcedureMeta[];
   error?: string;
+  /** The answer has finished streaming (sources are only shown, and saved, once it has). */
+  done?: boolean;
 }
 
 export interface ChatWidgetProps {
@@ -93,22 +97,93 @@ async function* parseNdjson(body: ReadableStream<Uint8Array>): AsyncGenerator<Re
 // showing a button that always 501s on click.
 const CHAT_UNAVAILABLE = process.env.NEXT_PUBLIC_DOCGEN_STATIC_EXPORT === "1";
 
+// The conversation is kept in sessionStorage so it survives moving between pages — full page
+// loads included (guide links, the host app's own navigation) — and clears when the tab closes.
+const STORAGE_KEY = "docgen-help-chat";
+
+interface SavedChat {
+  open: boolean;
+  turns: Turn[];
+}
+
+function loadChat(): SavedChat | undefined {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return undefined;
+    const saved = JSON.parse(raw) as SavedChat;
+    // Drop an answer that was still streaming when the page changed.
+    const turns = (saved.turns ?? []).filter((t) => t.role === "user" || t.done);
+    while (turns.length > 0 && turns[turns.length - 1].role === "user") turns.pop();
+    return { open: Boolean(saved.open), turns };
+  } catch {
+    return undefined;
+  }
+}
+
+function saveChat(chat: SavedChat) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(chat));
+  } catch {
+    // Storage full or blocked (private mode): the chat still works, it just won't persist.
+  }
+}
+
+/** The model-facing history: completed question/answer pairs only, so it always alternates. */
+function historyFrom(turns: Turn[]): { role: "user" | "assistant"; content: string }[] {
+  const history: { role: "user" | "assistant"; content: string }[] = [];
+  for (let i = 0; i + 1 < turns.length; i++) {
+    const q = turns[i];
+    const a = turns[i + 1];
+    if (q.role === "user" && a.role === "assistant" && a.done && a.text && !a.error) {
+      history.push({ role: "user", content: q.text }, { role: "assistant", content: a.text });
+      i++;
+    }
+  }
+  return history;
+}
+
+function formatDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help chat" }: ChatWidgetProps) {
   if (CHAT_UNAVAILABLE) return null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks -- CHAT_UNAVAILABLE is a build-time
-  // constant (inlined by Next from NEXT_PUBLIC_DOCGEN_STATIC_EXPORT), never toggles at runtime.
+  /* eslint-disable react-hooks/rules-of-hooks -- CHAT_UNAVAILABLE is a build-time constant
+   * (inlined by Next from NEXT_PUBLIC_DOCGEN_STATIC_EXPORT), never toggles at runtime. */
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
-  const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [restored, setRestored] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const origin = helpSiteOrigin(apiBase);
+
+  // Restore after mount (not during render) so server and client markup match.
+  useEffect(() => {
+    const saved = loadChat();
+    if (saved) {
+      setTurns(saved.turns);
+      setOpen(saved.open);
+    }
+    setRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (restored && !busy) saveChat({ open, turns });
+  }, [restored, busy, open, turns]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [turns, open]);
+  /* eslint-enable react-hooks/rules-of-hooks */
 
   async function ask(q: string) {
     if (!q.trim() || busy) return;
+    const history = historyFrom(turns);
     setBusy(true);
     setTurns((t) => [...t, { role: "user", text: q }, { role: "assistant", text: "" }]);
-    historyRef.current.push({ role: "user", content: q });
 
     try {
       const res = await fetch(apiBase, {
@@ -117,13 +192,13 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
         body: JSON.stringify({
           question: q,
           currentPath: currentPath ?? (typeof location !== "undefined" ? location.pathname : undefined),
-          history: historyRef.current.slice(0, -1),
+          history,
         }),
       });
 
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({ error: `request failed (${res.status})` }));
-        setTurns((t) => replaceLastAssistant(t, { role: "assistant", text: "", error: body.error ?? "something went wrong" }));
+        setTurns((t) => replaceLastAssistant(t, { role: "assistant", text: "", error: body.error ?? "something went wrong", done: true }));
         return;
       }
 
@@ -131,7 +206,7 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
       for await (const event of parseNdjson(res.body)) {
         if (event.type === "meta") {
           setTurns((t) =>
-            replaceLastAssistant(t, { role: "assistant", text: answer, citations: event.citations as Citation[], procedure: event.procedure as ProcedureMeta | undefined }),
+            replaceLastAssistant(t, { role: "assistant", text: answer, citations: event.citations as Citation[], procedures: event.procedures as ProcedureMeta[] | undefined }),
           );
         } else if (event.type === "delta") {
           answer += event.text as string;
@@ -140,9 +215,9 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
           setTurns((t) => replaceLastAssistant(t, { ...lastAssistant(t), error: event.message as string }));
         }
       }
-      historyRef.current.push({ role: "assistant", content: answer });
+      setTurns((t) => replaceLastAssistant(t, { ...lastAssistant(t), done: true }));
     } catch {
-      setTurns((t) => replaceLastAssistant(t, { role: "assistant", text: "", error: "couldn't reach help chat" }));
+      setTurns((t) => replaceLastAssistant(t, { role: "assistant", text: "", error: "couldn't reach help chat", done: true }));
     } finally {
       setBusy(false);
     }
@@ -156,6 +231,7 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
   }
 
   const empty = turns.length === 0;
+  const href = (url: string) => withOrigin(url, origin);
 
   return (
     <div className="not-prose fixed bottom-4 right-4 z-50 text-sm print:hidden">
@@ -166,7 +242,7 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
           }}
-          className="flex h-[min(34rem,calc(100vh-2rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[calc(var(--brand-radius,0.5rem)+6px)] border border-fd-border bg-fd-background shadow-2xl"
+          className="flex h-[min(36rem,calc(100vh-2rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[calc(var(--brand-radius,0.5rem)+6px)] border border-fd-border bg-fd-background shadow-2xl"
         >
           <div className="flex items-center gap-3 border-b border-fd-border bg-fd-card px-4 py-3">
             <span className="flex size-8 items-center justify-center rounded-full bg-fd-primary text-fd-primary-foreground">
@@ -176,6 +252,17 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
               <div className="truncate font-semibold">{title}</div>
               <div className="truncate text-xs text-fd-muted-foreground">Answers come from these help guides</div>
             </div>
+            {!empty && !busy ? (
+              <button
+                type="button"
+                onClick={() => setTurns([])}
+                aria-label="Start a new chat"
+                title="New chat"
+                className="rounded-md p-1.5 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground"
+              >
+                <NewChatIcon />
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setOpen(false)}
@@ -185,7 +272,7 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
               <CloseIcon />
             </button>
           </div>
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
             {empty ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-fd-muted-foreground">
                 <span className="flex size-10 items-center justify-center rounded-full bg-fd-primary/10 text-fd-primary">
@@ -193,54 +280,21 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
                 </span>
                 <p className="font-medium text-fd-foreground">Ask a question</p>
                 <p className="max-w-[16rem] text-xs">
-                  For example, “How do I record a payment?” You&apos;ll get an answer with links to the guide.
+                  For example, “How do I record a payment?” You&apos;ll get a short answer and a link to the guide.
                 </p>
               </div>
             ) : null}
-            {turns.map((turn, i) => (
-              <div key={i} className={turn.role === "user" ? "flex justify-end" : "flex flex-col items-start gap-2"}>
-                <div
-                  className={
-                    turn.role === "user"
-                      ? "max-w-[85%] rounded-2xl rounded-br-md bg-fd-primary px-3 py-2 text-fd-primary-foreground"
-                      : "max-w-[92%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-fd-muted px-3 py-2 text-fd-foreground"
-                  }
-                >
-                  {turn.text ||
-                    (busy && turn.role === "assistant" && i === turns.length - 1 ? (
-                      <span className="inline-flex gap-1 py-1" aria-label="Thinking">
-                        <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-current" />
-                      </span>
-                    ) : null)}
-                  {turn.error ? <div className="text-red-600 dark:text-red-400">{turn.error}</div> : null}
+            {turns.map((turn, i) =>
+              turn.role === "user" ? (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-fd-primary px-3 py-2 text-fd-primary-foreground">
+                    {turn.text}
+                  </div>
                 </div>
-                {turn.procedure?.firstScreenshot ? (
-                  <img
-                    src={withOrigin(turn.procedure.firstScreenshot, origin)}
-                    alt={turn.procedure.title}
-                    className="max-w-[92%] rounded-lg border border-fd-border"
-                  />
-                ) : null}
-                {turn.citations && turn.citations.length > 0 ? (
-                  <ul className="flex max-w-[92%] flex-wrap gap-1.5">
-                    {turn.citations.map((c) => (
-                      <li key={c.n}>
-                        <a
-                          href={withOrigin(c.url, origin)}
-                          className="inline-flex items-center gap-1 rounded-full border border-fd-border bg-fd-card px-2.5 py-1 text-xs hover:border-fd-primary/50 hover:text-fd-primary"
-                        >
-                          <span className="font-semibold text-fd-primary">{c.n}</span>
-                          {c.title}
-                          {c.heading ? ` · ${c.heading}` : ""}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ))}
+              ) : (
+                <AssistantTurn key={i} turn={turn} thinking={busy && i === turns.length - 1} href={href} />
+              ),
+            )}
           </div>
           <form
             className="flex items-center gap-2 border-t border-fd-border bg-fd-card p-3"
@@ -278,9 +332,77 @@ export function ChatWidget({ apiBase = "/api/chat", currentPath, title = "Help c
           className="inline-flex items-center gap-2 rounded-full bg-fd-primary p-3 font-medium text-fd-primary-foreground shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl sm:py-2.5 sm:pe-4 sm:ps-3"
         >
           <ChatIcon />
-          <span className="hidden sm:inline">Ask a question</span>
+          <span className="hidden sm:inline">{empty ? "Ask a question" : "Continue chat"}</span>
         </button>
       )}
+    </div>
+  );
+}
+
+/** One answer: the text, then — once it has finished — only the guides it actually cited, in
+ * citation order. A walkthrough gets a card (first screenshot, step count, video); any other
+ * page a link. */
+function AssistantTurn({ turn, thinking, href }: { turn: Turn; thinking: boolean; href: (url: string) => string }) {
+  const cited = citedNumbers(turn.text);
+  const sources = turn.done ? (turn.citations ?? []).filter((c) => cited.has(c.n)) : [];
+  const procedureFor = (c: Citation) => turn.procedures?.find((p) => p.url === c.url);
+  const guides = sources.filter(procedureFor);
+  const others = sources.filter((c) => !procedureFor(c));
+
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-fd-muted px-3 py-2 text-fd-foreground">
+        {turn.text ? (
+          <ChatMarkdown text={turn.text} citations={turn.citations} href={href} />
+        ) : thinking ? (
+          <span className="inline-flex gap-1 py-1" aria-label="Thinking">
+            <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+            <span className="size-1.5 animate-bounce rounded-full bg-current" />
+          </span>
+        ) : null}
+        {turn.error ? <div className="text-red-600 dark:text-red-400">{turn.error}</div> : null}
+      </div>
+      {guides.map((c) => {
+        const proc = procedureFor(c)!;
+        return (
+          <a
+            key={c.n}
+            href={href(c.url)}
+            className="group flex w-[92%] items-center gap-3 rounded-xl border border-fd-border bg-fd-card p-2 transition hover:border-fd-primary/50"
+          >
+            {proc.firstScreenshot ? (
+              <img src={href(proc.firstScreenshot)} alt="" className="h-14 w-20 shrink-0 rounded-md border border-fd-border object-cover object-top" />
+            ) : null}
+            <span className="min-w-0 flex-1">
+              <span className="line-clamp-2 font-medium leading-snug group-hover:text-fd-primary">
+                {guides.length > 1 ? <span className="me-1 text-fd-primary">{c.n}</span> : null}
+                {c.title}
+              </span>
+              <span className="mt-0.5 block text-xs text-fd-muted-foreground">
+                {proc.stepCount ? `${proc.stepCount} steps` : "Guide"}
+                {proc.firstVideoTimeSec !== undefined ? " · with video" : ""}
+                {" · "}
+                <span className="whitespace-nowrap text-fd-primary">Open guide →</span>
+              </span>
+            </span>
+          </a>
+        );
+      })}
+      {others.length > 0 ? (
+        <div className="flex max-w-[92%] flex-wrap items-center gap-1.5 text-xs text-fd-muted-foreground">
+          <span>{guides.length > 0 ? "Also see" : "From"}</span>
+          {others.map((c) => (
+            <a
+              key={c.n}
+              href={href(c.url)}
+              className="rounded-full border border-fd-border bg-fd-card px-2.5 py-1 text-fd-foreground hover:border-fd-primary/50 hover:text-fd-primary"
+            >
+              {c.title}
+            </a>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -298,6 +420,15 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
       <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function NewChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
     </svg>
   );
 }

@@ -175,10 +175,13 @@ export interface ChatConfig {
   /** Shown when chat can't answer from the docs (scope.md "Truthfulness": "says when it doesn't
    * know, pointing to support"). Plain text or a mailto:/https: URL. */
   supportContact?: string;
+  /** Product name the help chat introduces itself with, e.g. "TallyUp". Defaults to the brand
+   * name the help app detected. */
+  appName?: string;
   /** Origins allowed to call /api/chat cross-origin (the in-app widget's own origin) — the help
    * site's own origin is always allowed. Empty/unset: no cross-origin widget use. */
   allowedOrigins?: string[];
-  /** Max sections/procedures retrieved per question. Default 5. */
+  /** Max pages (whole guides) retrieved per question. Default 4. */
   retrievalLimit?: number;
   /** Hard cap on input tokens sent to the model (retrieved context + question), so one long
    * question/history can't blow the budget. Default 8000. */

@@ -29,3 +29,7 @@ examples/**/public/videos/
 
 # local demos
 /.demo/
+
+# local secrets — never commit
+.env
+.env.*

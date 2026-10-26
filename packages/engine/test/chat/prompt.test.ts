@@ -5,37 +5,64 @@ import {
   MAX_QUESTION_CHARS,
   assembleRequest,
   buildCitations,
+  buildContextBlock,
   buildSystemPrompt,
   capHistory,
   validateChatInput,
 } from "../../src/chat/prompt.js";
 import type { ChatHistoryTurn, RetrievedContext } from "../../src/chat/types.js";
 
+const procedure = {
+  id: "add-competitor",
+  title: "Add a competitor",
+  start: { page: "/competitors" },
+  steps: [{ n: 1, title: "Open competitors", instruction: "Click Competitors." }],
+};
+
 const context: RetrievedContext = {
-  hits: [
-    { url: "/add-competitor", title: "Add a competitor", heading: "Search first", text: "Search before adding.", score: 2 },
+  pages: [
+    {
+      url: "/add-competitor",
+      title: "Add a competitor",
+      score: 2,
+      sections: [
+        { url: "/add-competitor", title: "Add a competitor", text: "Add someone new." },
+        { url: "/add-competitor#search-first", title: "Add a competitor", heading: "Search first", text: "Search before adding." },
+        { url: "/add-competitor#steps", title: "Add a competitor", heading: "Steps", text: "" },
+        { url: "/add-competitor#part-1-add", title: "Add a competitor", heading: "Part 1: Add", text: "1. Open competitors Click Comp" },
+      ],
+      procedure,
+    },
   ],
-  procedure: {
-    id: "add-competitor",
-    title: "Add a competitor",
-    start: { page: "/competitors" },
-    steps: [{ n: 1, title: "Open competitors", instruction: "Click Competitors." }],
-  },
   topScore: 2,
 };
 
 describe("buildCitations", () => {
-  it("cites the procedure's library URL when procedures.json has one, else the legacy /<id>", () => {
-    expect(buildCitations(context)[0].url).toBe("/add-competitor");
-    const nested = { ...context, procedure: { ...context.procedure!, url: "/how-do-i/competitors/add-competitor" } };
-    expect(buildCitations(nested)[0].url).toBe("/how-do-i/competitors/add-competitor");
+  it("numbers each retrieved page once, best first", () => {
+    const two: RetrievedContext = {
+      ...context,
+      pages: [...context.pages, { url: "/record-payment", title: "Record a payment", score: 1, sections: [] }],
+    };
+    expect(buildCitations(two)).toEqual([
+      { n: 1, url: "/add-competitor", title: "Add a competitor" },
+      { n: 2, url: "/record-payment", title: "Record a payment" },
+    ]);
+  });
+});
+
+describe("buildContextBlock", () => {
+  it("gives each guide whole, with the procedure's full steps in place of the truncated step sections", () => {
+    const block = buildContextBlock(context, buildCitations(context));
+    expect(block).toContain("[1] Guide: Add a competitor");
+    expect(block).toContain("Add someone new.");
+    expect(block).toContain("Search first: Search before adding.");
+    expect(block).toContain("  1. Open competitors — Click Competitors.");
+    expect(block).not.toContain("Click Comp\n");
+    expect(block).not.toContain("Part 1: Add");
   });
 
-  it("numbers the procedure first, then each hit, in order", () => {
-    const citations = buildCitations(context);
-    expect(citations.map((c) => c.n)).toEqual([1, 2]);
-    expect(citations[0].title).toBe("Add a competitor");
-    expect(citations[1].heading).toBe("Search first");
+  it("says so when nothing matched", () => {
+    expect(buildContextBlock({ pages: [], topScore: 0 }, [])).toContain("no help guide matches");
   });
 });
 
@@ -72,9 +99,13 @@ describe("assembleRequest", () => {
     expect(req.messages[0]).toEqual({ role: "user", content: "hi" });
     const last = req.messages[req.messages.length - 1];
     expect(last.role).toBe("user");
-    expect(last.content).toContain("[1]");
-    expect(last.content).toContain("[2]");
+    expect(last.content).toContain("[1] Guide: Add a competitor");
     expect(last.content).toContain("Question: How do I add a competitor?");
+  });
+
+  it("introduces itself by the app's name when known", () => {
+    expect(buildSystemPrompt(undefined, "TallyUp")).toContain("help assistant for TallyUp");
+    expect(buildSystemPrompt(undefined)).toContain("help assistant for this app");
   });
 
   it("mentions the configured support contact when the answer doesn't know", () => {

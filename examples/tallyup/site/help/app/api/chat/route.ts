@@ -26,6 +26,7 @@ import {
   type ResolvedChatConfig,
 } from "docgen/dist/chat/index.js";
 import { isUnknownVersionError, resolveVersionSource } from "docgen/dist/versions/index.js";
+import { brand } from "@/lib/brand";
 
 // Node runtime (not edge): reads public/*.json off disk, and the Anthropic SDK's streaming
 // client needs Node's fetch/stream primitives, not the edge runtime's restricted subset.
@@ -46,8 +47,9 @@ async function readJson<T>(relPath: string): Promise<T | undefined> {
 }
 
 async function getChatConfig(): Promise<ResolvedChatConfig> {
-  const fromDisk = await readJson<ResolvedChatConfig>("chat-config.json");
-  return fromDisk ?? DEFAULT_CHAT_CONFIG;
+  const config = (await readJson<ResolvedChatConfig>("chat-config.json")) ?? DEFAULT_CHAT_CONFIG;
+  // The assistant introduces itself by the product's name — config first, else the brand.
+  return { ...config, appName: config.appName ?? (brand.name === "Help" ? undefined : brand.name) };
 }
 
 // Headers a hosting platform sets itself (never the originating client) ahead of any proxy the

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleChatRequest, resolveChatConfig } from "../../src/chat/handler.js";
+import { handleChatRequest, isSmallTalk, resolveChatConfig } from "../../src/chat/handler.js";
 import type { AnthropicChatClient, AnthropicStreamResult } from "../../src/chat/anthropic-client.js";
 import type { AssembledRequest } from "../../src/chat/prompt.js";
 import type { SearchIndexEntry } from "../../src/index-search/index.js";
@@ -127,6 +127,47 @@ describe("handleChatRequest", () => {
     expect(events.at(-1)).toMatchObject({ type: "done", unanswered: true });
     expect(recorded).toHaveLength(1);
     expect(recorded[0].path).toBe("/somewhere");
+  });
+
+  it("answers a greeting without sources and doesn't log it as unanswered", async () => {
+    const recorded: UnansweredEntry[] = [];
+    const result = await handleChatRequest({
+      request: { question: "Hi!", currentPath: "/add-competitor" },
+      config: resolveChatConfig(undefined, undefined),
+      searchIndexEntries: entries,
+      procedures,
+      apiKey: "sk-test",
+      clientId: "7.7.7.7",
+      anthropicClient: mockClient("Hi! I can help with how to do things in TallyUp."),
+      unansweredStore: { record: (e) => { recorded.push(e); } },
+    });
+    if (result.status !== 200) throw new Error(`status ${result.status}`);
+    const events = await collect(result.stream);
+    expect(events[0]).toEqual({ type: "meta", citations: [], procedures: [] });
+    expect(events.at(-1)).toMatchObject({ type: "done", unanswered: false });
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("logs as unanswered when the model says the guides don't cover it", async () => {
+    const recorded: UnansweredEntry[] = [];
+    const result = await handleChatRequest({
+      request: { question: "How do I add a competitor to the moon?" },
+      config: resolveChatConfig(undefined, undefined),
+      searchIndexEntries: entries,
+      procedures,
+      apiKey: "sk-test",
+      clientId: "7.7.7.8",
+      anthropicClient: mockClient("The help guides don't cover that yet."),
+      unansweredStore: { record: (e) => { recorded.push(e); } },
+    });
+    if (result.status !== 200) throw new Error(`status ${result.status}`);
+    expect((await collect(result.stream)).at(-1)).toMatchObject({ type: "done", unanswered: true });
+    expect(recorded).toHaveLength(1);
+  });
+
+  it("recognises greetings and thanks, not questions", () => {
+    for (const q of ["hi", "Hello there!", "thanks", "Thank you so much.", "G'day", "good morning"]) expect(isSmallTalk(q)).toBe(true);
+    for (const q of ["hi, how do I add an entry?", "How do I say thanks to a sponsor?", "ok so how do I pay"]) expect(isSmallTalk(q)).toBe(false);
   });
 
   it("rate-limits a client over its per-minute budget", async () => {

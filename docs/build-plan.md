@@ -112,7 +112,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Capture screenshots dominate capture time (~1 s each at device scale 2); not re-measured in M16.
 - A `.ts` config or adapter with TypeScript-only syntax fails under the built CLI without tsx.
 - Publish stage symlinks app files; check host CLIs follow them. Real deploys need host tokens.
-- Help chat untested with a live key; prompt caching off until a large stable prefix exists.
+- Help chat tested live 2026-10-26 (Haiku 4.5, `.demo/help`): grounded answers with citations, declines off-docs questions. Prompt caching off until a large stable prefix exists.
 - First-capture misses left: values a free-text field accepts, after-save behaviour. Repeatable captures that save data need a demo-data reset per app (emh-check has none).
 - Phase 2 left: GitHub Action and PR check (M18), change tiers and CI repair (M19), Studio callouts and timeline (M22). Answers in decisions 22–25 (no keys in CI, screenshot diffs on an orphan branch, public repo).
 - Playwright import maps 35% of emh-check calls: add `press`/`hover`/`focus` actions and exact-text checks to the walkthrough format to raise it.

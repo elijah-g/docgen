@@ -1,5 +1,5 @@
 // Shared types for the help chat (docs/scope.md "Help chat"; build-plan.md M15 step 4).
-import type { SearchHit } from "../index-search/index.js";
+import type { SearchIndexEntry } from "../index-search/index.js";
 import type { Procedure } from "../procedures/index.js";
 
 export interface ChatHistoryTurn {
@@ -31,21 +31,44 @@ export interface ChatCitation {
   heading?: string;
 }
 
+/** One retrieved page: every index section on it, in reading order, plus its walkthrough's
+ * procedure when it's a walkthrough page. */
+export interface RetrievedPage {
+  /** Page URL without an `#anchor`, e.g. "/how-do-i/payments/record-a-payment". */
+  url: string;
+  title: string;
+  /** The page's best section score. */
+  score: number;
+  sections: SearchIndexEntry[];
+  procedure?: Procedure;
+}
+
 /** Everything retrieved for one question, before the model sees it (chat/retrieve.ts). */
 export interface RetrievedContext {
-  hits: SearchHit[];
-  procedure?: Procedure;
+  /** Best page first. */
+  pages: RetrievedPage[];
   /** Top retrieval score — compared against `chat.unansweredScoreThreshold` to decide whether
    * this question counts as answered. */
   topScore: number;
 }
 
-/** First NDJSON event streamed to the client: citations + the matched procedure, before any
- * answer text, so the widget can render the sources/screenshot immediately. */
+/** A walkthrough the answer can show as a card: first screenshot, step count, video. */
+export interface ChatProcedureMeta {
+  id: string;
+  title: string;
+  url: string;
+  stepCount: number;
+  firstScreenshot?: string;
+  firstVideoTimeSec?: number;
+}
+
+/** First NDJSON event streamed to the client: citations + the matched walkthroughs, before any
+ * answer text, so the widget can show the guides the answer cites as soon as it finishes. */
 export interface ChatMetaEvent {
   type: "meta";
   citations: ChatCitation[];
-  procedure?: { id: string; title: string; firstScreenshot?: string; firstVideoTimeSec?: number };
+  /** Every retrieved walkthrough, in citation order. */
+  procedures: ChatProcedureMeta[];
 }
 
 export interface ChatDeltaEvent {
@@ -100,6 +123,9 @@ export interface ChatHandlerOptions {
 export interface ResolvedChatConfig {
   model: string;
   supportContact?: string;
+  /** Product name the assistant introduces itself with ("TallyUp"); the help app falls back to
+   * the detected brand name. */
+  appName?: string;
   allowedOrigins: string[];
   retrievalLimit: number;
   maxInputTokens: number;

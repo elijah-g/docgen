@@ -25,6 +25,8 @@ export type {
   ChatHistoryTurn,
   ChatCitation,
   RetrievedContext,
+  RetrievedPage,
+  ChatProcedureMeta,
   ChatStreamEvent,
   ChatMetaEvent,
   ChatDeltaEvent,
