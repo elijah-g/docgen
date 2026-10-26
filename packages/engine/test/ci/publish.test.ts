@@ -85,6 +85,9 @@ describe("runCiPublish", () => {
     expect(result.copiedToHelpApp).toBe(true);
     expect((indexStageOpts as { pages: BuildPageResult[] }).pages.map((p) => p.id)).toEqual(["add-entry"]);
     expect((indexStageOpts as { walkthroughIds: string[] }).walkthroughIds).toEqual(["add-entry", "broken-one", "untouched"]);
+    // public/screenshots (the PR check's disk baseline) is refreshed only for what published.
+    const sources = (indexStageOpts as { procedureSources: { walkthrough: { walkthrough: string } }[] }).procedureSources;
+    expect(sources.map((s) => s.walkthrough.walkthrough)).toEqual(["add-entry"]);
 
     vi.doUnmock("../../src/config/index.js");
     vi.doUnmock("../../src/impact/index.js");

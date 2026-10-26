@@ -80,7 +80,7 @@ export async function pushPreviewImages(
       // Branch doesn't exist yet — start it as an orphan in a fresh init'd repo.
       await run(opts.runner, scratch, ["init"]);
       await run(opts.runner, scratch, ["checkout", "--orphan", branch]);
-      await run(opts.runner, scratch, ["commit", "--allow-empty", "-m", "docgen-previews: initial commit"]);
+      await run(opts.runner, scratch, ["-c", "user.email=docgen-ci@users.noreply.github.com", "-c", "user.name=docgen-ci", "commit", "--allow-empty", "-m", "docgen-previews: initial commit"]);
     }
 
     const prefix = `pr-${opts.prNumber}/${result.head}`;

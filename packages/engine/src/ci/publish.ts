@@ -12,6 +12,7 @@ import { listWalkthroughs } from "../impact/walkthroughs.js";
 import { buildPage } from "../pages/index.js";
 import type { BuildPageResult } from "../pages/index.js";
 import { runIndexStage } from "../build/index-stage.js";
+import type { Walkthrough } from "../walkthrough/index.js";
 import { captureWalkthroughForCi } from "./capture.js";
 
 export interface RunCiPublishOptions {
@@ -57,6 +58,7 @@ export async function runCiPublish(opts: RunCiPublishOptions): Promise<CiPublish
   const published: string[] = [];
   const failed: string[] = [];
   const pages: BuildPageResult[] = [];
+  const procedureSources: { walkthrough: Walkthrough; captureDir: string }[] = [];
 
   for (const id of idsToPublish) {
     const entry = walkthroughEntries.find((w) => w.id === id);
@@ -81,6 +83,7 @@ export async function runCiPublish(opts: RunCiPublishOptions): Promise<CiPublish
     }
 
     pages.push(page);
+    procedureSources.push({ walkthrough: captured.walkthrough, captureDir: captured.captureDir });
     published.push(id);
   }
 
@@ -90,6 +93,9 @@ export async function runCiPublish(opts: RunCiPublishOptions): Promise<CiPublish
     helpApp: config.helpApp,
     pages,
     walkthroughIds: walkthroughEntries.map((w) => w.id),
+    // Also refreshes public/screenshots + procedures.json: the PR check's disk baseline reads
+    // public/screenshots, so leaving it out made every later PR diff against stale images.
+    procedureSources,
   });
 
   return { published, failed, all: affected.all, copiedToHelpApp: index.copiedToHelpApp, ok: failed.length === 0 };
