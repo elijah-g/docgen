@@ -22,3 +22,4 @@ export * from "./impact/index.js";
 export * from "./versions/index.js";
 export * from "./whats-new/index.js";
 export * from "./ci/index.js";
+export * from "./theme/index.js";

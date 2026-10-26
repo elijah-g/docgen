@@ -16,3 +16,4 @@ export {
   screenshotFile,
 } from "./content.js";
 export type { StepStatus, PageFrontmatter, FrontmatterLinks } from "./content.js";
+export { readFrontmatter, bodyOf, setFrontmatterFields, frontmatterBlock, type FrontmatterValue } from "./frontmatter.js";

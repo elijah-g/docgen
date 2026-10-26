@@ -2,22 +2,18 @@
 // `BuildPageResult`) — the one place the pdf module reaches into pages' output shape, kept
 // small and isolated so pages/pdf can keep evolving independently.
 import { readFileSync } from "node:fs";
-import path from "node:path";
 import type { Walkthrough } from "../walkthrough/index.js";
 import type { BuildPageResult } from "../pages/index.js";
 import type { ResolvedConfig } from "../config/index.js";
 import { cardStepsFor } from "./html.js";
+import { resolveArtifactBrand } from "../render/brand.js";
 import type { PdfBrand, PdfPageInput } from "./types.js";
 
-/** `config.brand` -> `PdfBrand`, with `logo` resolved to an absolute path (same source the
- * help app's theme reads — config.brand — so a PDF and the site always match). */
-export function resolvePdfBrand(config: ResolvedConfig): PdfBrand | undefined {
-  if (!config.brand) return undefined;
-  return {
-    primaryColor: config.brand.primaryColor,
-    font: config.brand.font,
-    logoPath: config.brand.logo ? path.resolve(config.configDir, config.brand.logo) : undefined,
-  };
+/** `config.brand` -> the PDFs' brand: `resolveArtifactBrand` (render/brand.ts — the one resolver
+ * the videos use too), with logo paths resolved against the config dir. Same source the help
+ * app's theme reads, so a PDF, a video and the site always match. Neutral look when unset. */
+export function resolvePdfBrand(config: Pick<ResolvedConfig, "configDir" | "brand">): PdfBrand {
+  return resolveArtifactBrand(config);
 }
 
 /** `index.plain.md` starts with the page's own YAML frontmatter fence (pages/content.ts
@@ -35,9 +31,12 @@ export function pdfInputFromPage(wf: Walkthrough, page: BuildPageResult): PdfPag
     const m = /step-(\d+)\.png$/.exec(file);
     if (m) screenshotByStep.set(Number(m[1]), file);
   }
+  const section = (wf as { section?: unknown }).section;
   return {
     id: wf.walkthrough,
     title: wf.title,
+    product: wf.product,
+    section: typeof section === "string" && section.trim() ? section.trim() : undefined,
     summary: wf.summary,
     for: wf.for,
     markdown,

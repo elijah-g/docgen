@@ -81,6 +81,38 @@ describe("writeDocgenConfig", () => {
     expect(content).not.toMatch(/\bci:\s*\{/);
   });
 
+  it("writes the full detected brand, with nested colors/dark objects in a fixed key order", () => {
+    const dir = tmpDir();
+    const result = writeDocgenConfig({
+      destDir: dir,
+      appUrl: "http://127.0.0.1:3100",
+      brand: {
+        radius: "10px",
+        dark: { background: "224 44% 7%", primary: "236 72% 71%" },
+        colors: { background: "222 26% 97%" },
+        name: "TallyUp",
+        primaryColor: "235 55% 42%",
+        logoDark: "../public/white.png",
+      },
+      detected: detectedNext,
+    });
+    const content = readFileSync(result.file, "utf8");
+    expect(content).toContain(`  brand: {
+    name: "TallyUp",
+    primaryColor: "235 55% 42%",
+    colors: {
+      background: "222 26% 97%",
+    },
+    dark: {
+      primary: "236 72% 71%",
+      background: "224 44% 7%",
+    },
+    logoDark: "../public/white.png",
+    radius: "10px",
+  },
+`);
+  });
+
   it("never overwrites an existing docgen.config.ts", () => {
     const dir = tmpDir();
     const file = join(dir, "docgen.config.ts");

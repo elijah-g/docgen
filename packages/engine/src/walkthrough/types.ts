@@ -130,6 +130,9 @@ export interface Walkthrough {
   product?: string;
   /** Audience/reader, e.g. "office-staff". */
   for?: string;
+  /** Where the page sits in the help library, e.g. "Payments", "Getting started" or
+   * "Entries / Late entries" — see placement.ts `libraryPlacement`. Default: "How do I…". */
+  section?: string;
   verifiedAgainst?: VerifiedAgainst;
   start?: Start;
   /** Values steps reference as {{path}}. */

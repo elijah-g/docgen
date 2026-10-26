@@ -218,3 +218,15 @@ author with a `docs:new` label; help chat off until an owner adds a key. docgen 
 GitHub (owner configurable per user); the TallyUp pilot may add the docs workflow to
 `competition-management`. Material copied from private apps (`reference/tallyup`, the emh-check
 example) stays local and out of the public history. Decisions 22–25.
+
+## 2026-10-26 · Polish, brand and library hierarchy
+
+The user asked for a much more polished doc site and Studio, every output in the origin app's
+brand, and hierarchy in the doc library. Built as M23: brand detection reads the app's colours
+(light and dark), accent, radius, font and logos into generated theme files; the site, Studio,
+narrated videos, PDFs and the drop-in chat widget all read them. Walkthroughs gain `section:`, and
+pages now sit in the scope.md categories with section pages and nested URLs (old links redirect).
+The site gained a home page with search and topics, card grids, a richer guide header, video
+chapters and a ⌘K search; the Studio a branded shell, library by section, step cards, a real page
+preview and video tab. Decision 26.
+

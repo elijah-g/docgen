@@ -36,23 +36,63 @@
     return node;
   }
 
-  var root = el("div", { style: "position:fixed;bottom:16px;right:16px;z-index:2147483000;font:14px system-ui,sans-serif;" });
-  var panel = el("div", {
-    style:
-      "display:none;width:320px;height:400px;background:#fff;border:1px solid #ddd;border-radius:8px;" +
-      "box-shadow:0 4px 16px rgba(0,0,0,.15);flex-direction:column;overflow:hidden;",
-  });
-  panel.style.display = "none";
-  var header = el("div", { style: "display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #eee;" }, [
-    el("strong", {}, ["Help chat"]),
-  ]);
-  var closeBtn = el("button", { style: "border:none;background:none;cursor:pointer;font-size:16px;" }, ["✕"]);
+  // Shadow DOM keeps the host app's CSS and the widget's apart in both directions.
+  var host = el("div", { "data-docgen-widget": "" });
+  var shadow = host.attachShadow ? host.attachShadow({ mode: "open" }) : host;
+  var style = document.createElement("style");
+  style.textContent = [
+    ":host{all:initial}",
+    ".dg{--p:#111827;--pf:#fff;--font:system-ui,-apple-system,'Segoe UI',sans-serif;position:fixed;bottom:16px;right:16px;z-index:2147483000;font:14px/1.45 var(--font);color:#111827}",
+    ".dg *{box-sizing:border-box;font:inherit}",
+    ".panel{display:none;flex-direction:column;width:min(24rem,calc(100vw - 32px));height:min(34rem,calc(100vh - 32px));background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 24px 60px -12px rgba(15,23,42,.35);overflow:hidden}",
+    ".panel.open{display:flex}",
+    ".head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #eef0f3;background:#fafbfc}",
+    ".mark{width:32px;height:32px;border-radius:999px;background:var(--p);color:var(--pf);display:grid;place-items:center;flex:none;overflow:hidden}",
+    ".mark img{width:22px;height:22px;object-fit:contain}",
+    ".title{font-weight:600}.sub{font-size:12px;color:#6b7280}",
+    ".x{margin-left:auto;border:0;background:none;cursor:pointer;color:#6b7280;padding:6px;border-radius:8px}.x:hover{background:#f1f3f5;color:#111827}",
+    ".msgs{flex:1;overflow-y:auto;padding:14px}",
+    ".empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#6b7280;gap:6px}",
+    ".empty b{color:#111827}",
+    ".b{margin:6px 0;padding:8px 12px;border-radius:16px;max-width:88%;white-space:pre-wrap;word-wrap:break-word}",
+    ".b.user{margin-left:auto;background:var(--p);color:var(--pf);border-bottom-right-radius:6px}",
+    ".b.assistant{background:#f1f3f5;border-bottom-left-radius:6px}",
+    ".cites{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;padding:0;list-style:none}",
+    ".cites a{display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:3px 10px;font-size:12px;color:#374151;text-decoration:none}",
+    ".cites a:hover{border-color:var(--p);color:var(--p)}",
+    "form{display:flex;gap:8px;align-items:center;padding:10px;border-top:1px solid #eef0f3;background:#fafbfc}",
+    "input{flex:1;min-width:0;border:1px solid #d1d5db;border-radius:999px;padding:8px 14px;outline:none;background:#fff;color:#111827}",
+    "input:focus{border-color:var(--p);box-shadow:0 0 0 3px color-mix(in srgb,var(--p) 20%,transparent)}",
+    ".send{width:36px;height:36px;border:0;border-radius:999px;background:var(--p);color:var(--pf);cursor:pointer;display:grid;place-items:center;flex:none}",
+    ".toggle{display:inline-flex;align-items:center;gap:8px;border:0;background:var(--p);color:var(--pf);border-radius:999px;padding:10px 16px 10px 12px;cursor:pointer;font-weight:600;box-shadow:0 8px 24px -6px rgba(15,23,42,.35)}",
+    ".toggle.hidden{display:none}",
+  ].join("\n");
+  shadow.appendChild(style);
+
+  var ICON_CHAT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var ICON_SEND = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>';
+  var ICON_X = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+  var root = el("div", { class: "dg" });
+  var panel = el("div", { class: "panel", role: "dialog", "aria-label": "Help chat" });
+  var mark = el("span", { class: "mark" });
+  mark.innerHTML = ICON_CHAT;
+  var titleEl = el("div", { class: "title" }, ["Help chat"]);
+  var header = el("div", { class: "head" }, [mark, el("div", {}, [titleEl, el("div", { class: "sub" }, ["Answers come from the help guides"])])]);
+  var closeBtn = el("button", { class: "x", type: "button", "aria-label": "Close help chat" });
+  closeBtn.innerHTML = ICON_X;
   header.appendChild(closeBtn);
 
-  var messages = el("div", { style: "flex:1;overflow-y:auto;padding:8px 12px;" });
-  var form = el("form", { style: "display:flex;gap:4px;border-top:1px solid #eee;padding:8px;" });
-  var input = el("input", { style: "flex:1;border:1px solid #ccc;border-radius:4px;padding:6px 8px;", placeholder: "Ask a question…" });
-  var sendBtn = el("button", { type: "submit", style: "border:none;background:#111;color:#fff;border-radius:4px;padding:6px 12px;cursor:pointer;" }, ["Send"]);
+  var messages = el("div", { class: "msgs" });
+  var empty = el("div", { class: "empty" }, [
+    el("b", {}, ["Ask a question"]),
+    el("div", { style: "font-size:12px;max-width:16rem" }, ["You'll get an answer with links to the guide that shows how."]),
+  ]);
+  messages.appendChild(empty);
+  var form = el("form", {});
+  var input = el("input", { placeholder: "Ask a question…", "aria-label": "Ask the help chat" });
+  var sendBtn = el("button", { type: "submit", class: "send", "aria-label": "Send" });
+  sendBtn.innerHTML = ICON_SEND;
   form.appendChild(input);
   form.appendChild(sendBtn);
 
@@ -60,31 +100,54 @@
   panel.appendChild(messages);
   panel.appendChild(form);
 
-  var toggle = el(
-    "button",
-    { style: "border:none;background:#111;color:#fff;border-radius:999px;padding:10px 18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);" },
-    ["Help"],
-  );
+  var toggle = el("button", { type: "button", class: "toggle" });
+  toggle.innerHTML = ICON_CHAT;
+  toggle.appendChild(document.createTextNode("Ask a question"));
 
   root.appendChild(panel);
   root.appendChild(toggle);
-  document.body.appendChild(root);
+  shadow.appendChild(root);
+  document.body.appendChild(host);
+
+  // The help site's brand (written by the docgen engine): colour, name, logo and font, so the
+  // widget looks like part of the app rather than a third-party bolt-on.
+  fetch(helpUrl + "/brand/theme.json")
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (t) {
+      if (!t) return;
+      if (t.primary) root.style.setProperty("--p", t.primary);
+      if (t.primaryForeground) root.style.setProperty("--pf", t.primaryForeground);
+      if (t.fontFamily) root.style.setProperty("--font", t.fontFamily);
+      if (t.name) {
+        titleEl.textContent = t.name + " help";
+        panel.setAttribute("aria-label", t.name + " help chat");
+      }
+      if (t.logo) {
+        mark.style.background = "#fff";
+        mark.innerHTML = "";
+        mark.appendChild(el("img", { src: helpUrl + t.logo, alt: "" }));
+      }
+    })
+    .catch(function () {});
 
   toggle.addEventListener("click", function () {
-    panel.style.display = "flex";
-    toggle.style.display = "none";
+    panel.classList.add("open");
+    toggle.classList.add("hidden");
+    input.focus();
   });
   closeBtn.addEventListener("click", function () {
-    panel.style.display = "none";
-    toggle.style.display = "block";
+    panel.classList.remove("open");
+    toggle.classList.remove("hidden");
+  });
+  panel.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeBtn.click();
   });
 
   function addBubble(role, text) {
-    var bubble = el("div", {
-      style:
-        "margin:6px 0;padding:6px 10px;border-radius:8px;max-width:85%;white-space:pre-wrap;" +
-        (role === "user" ? "margin-left:auto;background:#eef;" : "background:#f3f3f3;"),
-    });
+    if (empty.parentNode) empty.parentNode.removeChild(empty);
+    var bubble = el("div", { class: "b " + role });
     bubble.textContent = text;
     messages.appendChild(bubble);
     messages.scrollTop = messages.scrollHeight;
@@ -93,11 +156,11 @@
 
   function addCitations(citations) {
     if (!citations || !citations.length) return;
-    var list = el("ul", { style: "margin:2px 0 10px;padding-left:16px;font-size:12px;color:#666;" });
+    var list = el("ul", { class: "cites" });
     citations.forEach(function (c) {
       var li = el("li", {});
       var a = el("a", { href: helpUrl + c.url, target: "_blank", rel: "noreferrer" }, [
-        "[" + c.n + "] " + c.title + (c.heading ? " — " + c.heading : ""),
+        c.n + " · " + c.title + (c.heading ? " — " + c.heading : ""),
       ]);
       li.appendChild(a);
       list.appendChild(li);

@@ -1,8 +1,7 @@
-// Site-wide constants. `appName` and `gitConfig` are placeholders `docgen init`
-// overwrites from the detected app repo; everything else stays as-is.
-export const appName = "Help";
+// Site-wide constants. Everything brand-specific (name, logo, colours) comes from lib/brand.ts.
 export const siteRoute = "";
 
+/** Top-level library categories (docs/scope.md "Help site"), in sidebar order. */
 export const siteSections = [
   { slug: "getting-started", title: "Getting started" },
   { slug: "how-do-i", title: "How do I…" },

@@ -46,6 +46,7 @@ export interface StudioAction {
 
 export interface StudioStep {
   id?: string;
+  chapter?: string;
   title?: string;
   say?: string;
   caption?: string;
@@ -59,6 +60,8 @@ export interface StudioStep {
 export interface StudioWalkthrough {
   walkthrough: string;
   title: string;
+  summary?: string;
+  section?: string;
   steps: StudioStep[];
 }
 
@@ -79,11 +82,37 @@ export interface StudioManifest {
   steps: StudioManifestStep[];
 }
 
+/** Mirrors app/studio/_lib/server.ts's CaptureStatus. */
+export type CaptureStatus = "passed" | "failed" | "captured" | "not-captured";
+
 export interface WalkthroughSummary {
   id: string;
   file: string;
   title: string;
   stepCount: number;
+  section?: string;
+  summary?: string;
+  status: CaptureStatus;
+  lastChecked?: string;
+}
+
+/** GET /studio/api/walkthrough's response. */
+export interface WalkthroughDetail {
+  walkthrough: StudioWalkthrough;
+  manifest?: StudioManifest;
+  status: CaptureStatus;
+  lastChecked?: string;
+  siteUrl?: string;
+  hasVideo: boolean;
+}
+
+/** GET /studio/api/page's response. `text` keeps docgen's block markers (the preview uses them
+ * to find each step's section); `builtAt`/`editedAt` are file mtimes in ms. */
+export interface PageData {
+  found: boolean;
+  text?: string;
+  builtAt?: number;
+  editedAt?: number;
 }
 
 export interface HistoryEntry {
@@ -94,4 +123,6 @@ export interface HistoryEntry {
   before: unknown;
   after: unknown;
   file?: string;
+  /** On an `undo:<action>` entry: the index (oldest-first) of the entry it reverted. */
+  undoOf?: number;
 }

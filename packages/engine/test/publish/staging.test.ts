@@ -41,6 +41,25 @@ describe("findStagedVideos / needsBlobStorage", () => {
 });
 
 describe("rewriteVideoLinksInStage", () => {
+  it("rewrites a nested library page whose links are site URLs under /videos/<id>/ (index stage layout), captions to their own upload", () => {
+    const helpRoot = makeHelpRoot();
+    writePage(helpRoot, "how-do-i/payments/add-entry", { video: "/videos/add-entry/add-entry.mp4", srt: "/videos/add-entry/add-entry.srt" });
+    writeVideo(helpRoot, "public/videos/add-entry/add-entry.mp4", 10);
+    writeFileSync(join(helpRoot, "public", "videos", "add-entry", "add-entry.srt"), "1");
+    const [video] = findStagedVideos(helpRoot);
+    const media = [video, ...findCaptionsFor(helpRoot, video)];
+    const uploads = new Map<string, BlobUploadResult>(
+      media.map((m) => [m.relPath, { url: `https://blob.example.com/${m.relPath.split("/").pop()}`, key: m.relPath, bytes: m.bytes }]),
+    );
+
+    const stage = createStage(helpRoot);
+    rewriteVideoLinksInStage(helpRoot, stage, media, uploads);
+
+    const staged = readFileSync(join(stage, "content", "docs", "how-do-i", "payments", "add-entry", "index.mdx"), "utf8");
+    expect(staged).toContain('video: "https://blob.example.com/add-entry.mp4"');
+    expect(staged).toContain('srt: "https://blob.example.com/add-entry.srt"');
+  });
+
   it("rewrites the staged copy's video link, leaving the source page untouched", () => {
     const helpRoot = makeHelpRoot();
     const sourceFile = writePage(helpRoot, "add-entry", { video: "../../videos/add-entry/add-entry.mp4" });

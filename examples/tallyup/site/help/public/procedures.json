@@ -2,6 +2,7 @@
   {
     "id": "add-competitor-and-entry",
     "title": "Add a new competitor and their first entry",
+    "url": "/how-do-i/competitors/add-competitor-and-entry",
     "for": "Show office staff and secretaries taking entries at the office or over the phone",
     "start": {
       "page": "/dashboard",
@@ -126,6 +127,7 @@
   {
     "id": "filter-unpaid-entries",
     "title": "Find unpaid entries",
+    "url": "/how-do-i/payments/filter-unpaid-entries",
     "for": "Show office staff following up entry fees",
     "start": {
       "page": "/dashboard/entries",
@@ -162,6 +164,7 @@
   {
     "id": "record-a-payment",
     "title": "Record a payment",
+    "url": "/how-do-i/payments/record-a-payment",
     "for": "Show office staff taking entry fees at the office",
     "start": {
       "page": "/dashboard/payments",
@@ -220,6 +223,7 @@
   {
     "id": "update-a-competitors-phone",
     "title": "Update a competitor's phone number",
+    "url": "/how-do-i/competitors/update-a-competitors-phone",
     "for": "Show office staff keeping competitor details current",
     "start": {
       "page": "/dashboard/competitors",

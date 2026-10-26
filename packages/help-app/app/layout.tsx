@@ -1,17 +1,33 @@
-import { RootProvider } from "fumadocs-ui/provider/next";
+import type { Metadata } from "next";
+import { Providers } from "@/components/site/providers";
+import { brand, siteTitle } from "@/lib/brand";
 import "./globals.css";
+
+export const metadata: Metadata = {
+  title: { default: siteTitle, template: `%s · ${siteTitle}` },
+  description: `Guides, videos and printable instructions for ${brand.name === "Help" ? "this app" : brand.name}.`,
+  icons: brand.icon ? { icon: brand.icon, apple: brand.icon } : undefined,
+};
 
 export default function Layout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* The app's own font (lib/brand.json, from docgen.config's brand). A plain stylesheet
+         * link rather than next/font: the family is only known per app, and hosts then don't
+         * need network access to Google Fonts at build time. */}
+        {brand.fontUrl ? (
+          <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+            <link rel="stylesheet" href={brand.fontUrl} />
+          </>
+        ) : null}
+      </head>
       <body className="flex min-h-screen flex-col">
-        {/* fumadocs-ui's own Ctrl+K search dialog expects a server search API route (e.g.
-         * `/api/search`) that this app never defines — on any host, not just a static export,
-         * it always rendered "Search failed". scope.md's search is a built-in client-side index
-         * (`public/search-index.json`, no database) via components/search-box.tsx's SearchBox,
-         * not fumadocs' dialog, so disable the latter outright rather than leave a broken
-         * Ctrl+K sitting on every page (caught by actually using the search UI in a browser). */}
-        <RootProvider search={{ enabled: false }}>{children}</RootProvider>
+        {/* Search: Ctrl/⌘ K and Fumadocs' search buttons open docgen's dialog over the
+         * engine-built public/search-index.json (no server route, works on a static export). */}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

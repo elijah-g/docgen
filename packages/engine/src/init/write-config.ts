@@ -24,11 +24,46 @@ export interface WriteConfigResult {
   written: boolean;
 }
 
-function brandBlock(brand: BrandConfig): string {
-  const fields = Object.entries(brand).filter(([, v]) => v !== undefined);
+/** Key order for a written `brand` block (and its `colors`/`dark` objects) — fixed, so the
+ * generated config is stable. */
+const BRAND_KEY_ORDER = [
+  "name", "primaryColor", "accentColor", "colors", "dark", "logo", "logoDark", "icon", "font", "fontUrl", "headingFont", "radius",
+];
+const COLOR_KEY_ORDER = ["primary", "primaryForeground", "accent", "background", "foreground", "card", "muted", "mutedForeground", "border"];
+
+function ordered(obj: Record<string, unknown>, order: string[]): Array<[string, unknown]> {
+  const entries = Object.entries(obj).filter(([, v]) => v !== undefined && v !== null);
+  const rank = (k: string) => (order.includes(k) ? order.indexOf(k) : order.length);
+  return entries.sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+/** A `brand: { ... }` object literal for docgen.config.ts (two-space indent, nested colour
+ * objects), or "" when there's nothing to write. Exported for `docgen theme --detect`. */
+export function formatBrandBlock(brand: BrandConfig, indent = "  "): string {
+  const fields = ordered(brand as Record<string, unknown>, BRAND_KEY_ORDER);
   if (fields.length === 0) return "";
-  const lines = fields.map(([k, v]) => `    ${k}: ${JSON.stringify(v)},`);
-  return `  brand: {\n${lines.join("\n")}\n  },\n`;
+  const inner = `${indent}  `;
+  const lines: string[] = [];
+  for (const [k, v] of fields) {
+    if (v && typeof v === "object") {
+      const sub = ordered(v as Record<string, unknown>, COLOR_KEY_ORDER);
+      if (sub.length === 0) continue;
+      lines.push(`${inner}${k}: {`);
+      for (const [sk, sv] of sub) lines.push(`${inner}  ${sk}: ${JSON.stringify(sv)},`);
+      lines.push(`${inner}},`);
+    } else {
+      lines.push(`${inner}${k}: ${JSON.stringify(v)},`);
+    }
+  }
+  return `${indent}brand: {\n${lines.join("\n")}\n${indent}},\n`;
+}
+
+function brandBlock(brand: BrandConfig): string {
+  const block = formatBrandBlock(brand);
+  if (!block) return "";
+  return `  // Detected from the app by \`docgen init\`; \`docgen theme\` turns it into the help app's
+  // app/brand.css, lib/brand.json and public/brand/. Paths are relative to this file.
+${block}`;
 }
 
 function ciBlock(ci: WriteConfigOptions["ci"]): string {

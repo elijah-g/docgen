@@ -1,14 +1,17 @@
 // `docgen init [dir] [--app-repo <path>] [--json]` — scope.md "First run:
 // engineer" step 1. Copies the help-app template into `<dir>/help`, detects
 // the target app's framework/routes (comments only) and brand, and writes
-// `docgen.config.ts`. Never overwrites a file that's already there.
+// `docgen.config.ts`, then writes the help app's theme files (app/brand.css, lib/brand.json,
+// public/brand/) from that brand. Never overwrites a file that's already there — except the
+// generated theme files, and only when the config was freshly written.
 import { resolve, relative } from "node:path";
 import { detectFramework } from "../init/detect.js";
-import { extractBrand } from "../init/brand.js";
+import { extractBrand, rebaseBrandPaths } from "../init/brand.js";
 import { copyTemplate } from "../init/copy-template.js";
 import { writeDocgenConfig } from "../init/write-config.js";
 import { writeCiWorkflow, writeClaudeRepairWorkflow } from "../init/ci.js";
 import type { BrandConfig } from "../config/types.js";
+import { writeHelpAppTheme } from "../theme/write.js";
 
 export interface InitOptions {
   /** Repo to add the help app to; `<dir>/help` is the destination. Default cwd. */
@@ -47,6 +50,9 @@ export interface InitResult {
   copied: number;
   skipped: string[];
   config: { file: string; written: boolean };
+  /** Theme files written from the detected brand (only when the config was freshly written —
+   * an existing config is the source of truth; run `docgen theme` for it). */
+  theme?: { files: string[]; written: string[]; warnings: string[] };
   ci?: { file: string; written: boolean };
   claudeRepair?: { file: string; written: boolean };
 }
@@ -61,7 +67,8 @@ export function runInitCommand(options: InitOptions): InitResult {
     const list = detected.apps.map((a) => `${a.path} (${a.routeCount} routes)`).join(", ");
     throw new Error(`found ${detected.apps.length} Next.js apps in this workspace — pass --app <path> to pick one: ${list}`);
   }
-  const brand = extractBrand(appRepoDir);
+  // Asset paths come back relative to the app repo; the config wants them relative to itself.
+  const brand = rebaseBrandPaths(extractBrand(appRepoDir), appRepoDir, destDir);
   const { copied, skipped } = copyTemplate(destDir);
   const config = writeDocgenConfig({
     destDir,
@@ -70,6 +77,11 @@ export function runInitCommand(options: InitOptions): InitResult {
     detected,
     ci: options.ci ? { claudeAction: options.ciClaude, docsRepo: options.ciDocsRepo } : undefined,
   });
+  let theme: InitResult["theme"];
+  if (config.written) {
+    const t = writeHelpAppTheme({ brand, configDir: destDir }, destDir);
+    theme = { files: t.files, written: t.written, warnings: t.warnings };
+  }
 
   let ci: { file: string; written: boolean } | undefined;
   let claudeRepair: { file: string; written: boolean } | undefined;
@@ -99,6 +111,7 @@ export function runInitCommand(options: InitOptions): InitResult {
     copied: copied.length,
     skipped,
     config,
+    theme,
     ci,
     claudeRepair,
   };
@@ -126,7 +139,7 @@ export function runInit(options: InitOptions, json: boolean): number {
   console.log(`help app scaffolded at ${result.destDir}`);
   console.log(`  app repo: ${result.appRepoDir} (${result.framework})`);
   if (result.routes.length > 0) console.log(`  routes seen: ${result.routes.join(", ")}`);
-  const brandEntries = Object.entries(result.brand);
+  const brandEntries = Object.entries(result.brand).filter(([, v]) => typeof v === "string");
   if (brandEntries.length > 0) {
     console.log(`  brand: ${brandEntries.map(([k, v]) => `${k}=${v}`).join(", ")}`);
   }
@@ -135,6 +148,10 @@ export function runInit(options: InitOptions, json: boolean): number {
     console.log(`  skipped (already present): ${result.skipped.join(", ")}`);
   }
   console.log(result.config.written ? `  wrote ${result.config.file}` : `  left existing ${result.config.file} untouched`);
+  if (result.theme) {
+    console.log(`  theme: ${result.theme.written.length} file(s) written (app/brand.css, lib/brand.json, public/brand/)`);
+    for (const w of result.theme.warnings) console.log(`  warning: ${w}`);
+  }
   if (result.ci) {
     console.log(result.ci.written ? `  wrote ${result.ci.file}` : `  left existing ${result.ci.file} untouched`);
   }

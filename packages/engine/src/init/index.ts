@@ -1,9 +1,10 @@
 export { detectFramework } from "./detect.js";
 export type { DetectResult, DetectedFramework } from "./detect.js";
-export { extractBrand } from "./brand.js";
+export { extractBrand, rebaseBrandPaths, parseCssBlocks, stripTagline } from "./brand.js";
+export type { CssBlock } from "./brand.js";
 export { copyTemplate, TEMPLATE_DIR } from "./copy-template.js";
 export type { CopyTemplateResult } from "./copy-template.js";
-export { writeDocgenConfig } from "./write-config.js";
+export { writeDocgenConfig, formatBrandBlock } from "./write-config.js";
 export type { WriteConfigOptions, WriteConfigResult } from "./write-config.js";
 export { writeCiWorkflow, writeClaudeRepairWorkflow } from "./ci.js";
 export type { WriteCiWorkflowOptions, WriteCiWorkflowResult, WriteClaudeRepairWorkflowOptions, WriteClaudeRepairWorkflowResult } from "./ci.js";

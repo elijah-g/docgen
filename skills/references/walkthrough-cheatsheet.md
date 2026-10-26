@@ -13,6 +13,7 @@ title: Add a new competitor      # user-facing
 summary: One or two sentences.
 product: TallyUp
 for: Office staff taking entries
+section: Competitors             # optional: where the page sits in the help site (see below)
 verifiedAgainst: { app: "...", routes: [...], sources: [...] }  # filled in after capture, not before
 start:
   signed_in_as: office_staff
@@ -26,6 +27,22 @@ outro: { title, recap: [...], say, caption }
 steps: [ ... ]        # minItems: 1
 validate: { database: [ { name, sql, params, expect } ] }   # optional, engineer-owned
 ```
+
+### `section:` — where the page sits
+
+Optional. Leave it out and the page goes straight into **How do I…**. A value whose first part
+names a top-level category — `Getting started`, `How do I…`, `Screens and settings`, `Words we
+use`, `Troubleshooting and FAQ`, `What's new` (title or slug, any case) — goes into that category;
+anything else is a feature group inside How do I…. Nest with ` / `:
+
+```yaml
+section: Payments                      # How do I… / Payments
+section: Entries / Late entries        # How do I… / Entries / Late entries
+section: Getting started               # Getting started
+```
+
+Plain words only (letters, numbers, spaces, light punctuation). Use the app's own name for the
+area (the menu item a reader clicks), and reuse the same value across walkthroughs in that area.
 
 ## A step
 

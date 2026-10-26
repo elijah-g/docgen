@@ -28,21 +28,87 @@
   const blurLayer = $('blurLayer'), calloutLayer = $('calloutLayer'), calloutLegend = $('calloutLegend')
   const ripples = TL.clicks.map(() => { const r = document.createElement('div'); r.className = 'ripple'; cam.insertBefore(r, cursor); return r })
 
+  // ------------------------------------------------------------ brand (static, set once)
+  // Colours/font/logo only ever change styling set here at load — never anything renderAt(t)
+  // computes per frame — so render/state.ts's frameSignature is unaffected by the brand.
   const brand = TL.brand ?? { name: '' }
+  const rootStyle = document.documentElement.style
+  const kebab = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+  for (const [k, v] of Object.entries(brand.colors || {})) if (v) rootStyle.setProperty(`--brand-${kebab(k)}`, v)
+  const stack = (f) => `"${f}", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`
+  if (brand.font) rootStyle.setProperty('--font', stack(brand.font))
+  if (brand.headingFont) rootStyle.setProperty('--heading-font', stack(brand.headingFont))
+  const logos = []
   for (const [nameId, logoId] of [['brand-name', 'brand-logo'], ['outro-brand-name', 'outro-logo']]) {
     $(nameId).textContent = brand.name
-    if (brand.logoSrc) { $(logoId).src = brand.logoSrc; $(logoId).style.display = '' }
+    if (brand.logoSrc) { $(logoId).src = brand.logoSrc; $(logoId).style.display = ''; logos.push($(logoId)) }
   }
+  // Long titles step down a size so they wrap to at most ~2-3 balanced lines.
+  const sizeTitle = (el, text) => {
+    const n = (text || '').length
+    el.classList.toggle('long', n > 34 && n <= 58)
+    el.classList.toggle('xlong', n > 58)
+  }
+
+  // Everything the first frame depends on that loads asynchronously — the brand webfont and the
+  // logo's decode — resolves `window.brandReady`, which the renderer awaits before frame 0. Each
+  // wait is capped so an offline render (fontUrl unreachable) falls back to the system font
+  // instead of hanging.
+  const capped = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(r, ms))])
+  const fontsReady = (async () => {
+    if (brand.fontUrl) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = brand.fontUrl
+      const loaded = new Promise((r) => { link.onload = r; link.onerror = r })
+      document.head.appendChild(link)
+      await capped(loaded, 5000)
+    }
+    const families = [brand.font, brand.headingFont].filter(Boolean)
+    await Promise.all(families.flatMap((f) => ['500', '600', '700', '800'].map((w) =>
+      document.fonts.load(`${w} 32px "${f}"`).catch(() => {}))))
+    await document.fonts.ready
+  })()
+  // A light-background logo that would be too dark to read on the night canvas sits on a white
+  // tile instead (logoDark, made for dark backgrounds, is always shown bare).
+  const logoReady = (async () => {
+    if (!logos.length || brand.logoForDark) return
+    const img = logos[0]
+    await img.decode().catch(() => {})
+    if (!img.naturalWidth) return
+    try {
+      const c = document.createElement('canvas')
+      const w = (c.width = 48), h = (c.height = 48)
+      const ctx = c.getContext('2d')
+      ctx.drawImage(img, 0, 0, w, h)
+      const d = ctx.getImageData(0, 0, w, h).data
+      let sum = 0, n = 0
+      for (let i = 0; i < d.length; i += 4) {
+        const a = d[i + 3] / 255
+        if (a < 0.2) continue
+        sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255
+        n++
+      }
+      const luminance = n ? sum / n : 1
+      const opaque = n / (w * h)
+      // Dark artwork, or a fully opaque (non-transparent) image, reads better as a tile.
+      if (luminance < 0.42 || opaque > 0.97) logos.forEach((l) => l.classList.add('tile'))
+    } catch { /* tainted/undecodable: leave bare */ }
+  })()
+  window.brandReady = capped(Promise.all([fontsReady, logoReady]), 8000)
 
   $('intro-eyebrow').textContent = TL.intro.eyebrow
   $('intro-title').innerHTML = TL.intro.titleHtml
+  sizeTitle($('intro-title'), $('intro-title').textContent)
   $('intro-sub').textContent = TL.intro.subtitle
   $('intro-parts').innerHTML = TL.chapters.map((c, i) => `<div class="part"><span class="n">${i + 1}</span>${c}</div>`).join('')
   $('outro-title').textContent = TL.outro.title
+  sizeTitle($('outro-title'), TL.outro.title)
   const tick = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
   $('outro-recap').innerHTML = TL.outro.recap.map((r) => `<div class="row"><span class="tick">${tick}</span><span>${r}</span></div>`).join('')
   const recapRows = [...$('outro-recap').children]
-  $('outro-tagline').textContent = brand.name
+  // The outro's brand row (logo + name) already shows the product, so the footer line stays empty.
+  $('outro-tagline').textContent = ''
 
   // ------------------------------------------------------------ lookups
   function lastAtOrBefore(list, t, key = 't') {

@@ -32,6 +32,7 @@ in code. Revisit any of them with evidence from Phase 0.
 | 23 | PR screenshot diffs are committed to a `docgen-previews` orphan branch in the app repo and shown inline in one PR comment; Actions artifacts as fallback. No preview deploys for now | Needs only the workflow's own GitHub token; no extra service or key |
 | 24 | Docs PRs from docgen request review from the app PR's author (configurable); drafted walkthroughs get the `docs:new` label | The author knows what changed |
 | 25 | docgen is a public repo; GitHub owner and repo are per-user settings, never hardcoded. Help chat is off until an owner adds their own key | Open-source engine; the chat can't run through Claude Code |
+| 26 | The help library follows scope.md's categories; walkthroughs set an optional `section:` and their pages live at nested URLs (`/how-do-i/payments/record-a-payment`); old flat `/<id>` links redirect. Brand comes from the app's own CSS/assets into generated theme files that the site, Studio, video and PDFs all read | Hierarchy readers can browse; one brand source for every output (scope.md principle 11) |
 
 ## Open
 

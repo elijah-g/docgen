@@ -47,3 +47,13 @@ describe("pdfPublicLinks", () => {
     expect(pdfPublicLinks("add-thing")).toEqual({ pdf: "/pdf/add-thing.pdf", pdfCard: "/pdf/add-thing.card.pdf" });
   });
 });
+
+describe("resolvePdfBrand", () => {
+  it("is the shared artifact brand: neutral without config.brand, resolved logo path with it", async () => {
+    const { resolvePdfBrand } = await import("../../src/pdf/input.js");
+    expect(resolvePdfBrand({ configDir: "/app" }).configured).toBe(false);
+    const b = resolvePdfBrand({ configDir: "/app", brand: { primaryColor: "235 55% 42%", logo: "public/logo.png", font: "Inter" } });
+    expect(b.logoPath).toBe("/app/public/logo.png");
+    expect(b.colors?.primary).toBe("hsl(235 55% 42%)");
+  });
+});

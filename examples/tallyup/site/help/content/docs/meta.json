@@ -2,12 +2,12 @@
   "title": "Help",
   "pages": [
     "index",
-    "...",
     "getting-started",
     "how-do-i",
     "screens-and-settings",
     "words-we-use",
     "troubleshooting-and-faq",
-    "whats-new"
+    "whats-new",
+    "..."
   ]
 }

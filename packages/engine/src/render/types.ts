@@ -98,12 +98,30 @@ export interface TimelineScene {
   t1: number;
 }
 
+/** The brand the player paints title cards, the step chip, highlights and gradients with
+ * (render/brand.ts's `timelineBrand`). Only `name` is required so hand-built fixtures stay valid;
+ * the player falls back to a neutral look for anything missing. Never affects per-frame state
+ * (state.ts) — only static styling set once at load. */
+export interface TimelineBrand {
+  name: string;
+  /** data: URL of the logo shown on the dark intro/outro cards. */
+  logoSrc?: string;
+  /** True when `logoSrc` came from `logoDark` (made for dark backgrounds); otherwise the player
+   * puts a light logo on a light tile if it would be too dark to read on the night canvas. */
+  logoForDark?: boolean;
+  colors?: { primary: string; accent: string; primaryForeground?: string };
+  font?: string;
+  headingFont?: string;
+  /** https stylesheet the player loads (capped wait) before the first frame. */
+  fontUrl?: string;
+}
+
 export interface Timeline {
   fps: number;
   viewport: { w: number; h: number };
   stage: { x: number; y: number; w: number; h: number };
   fade: number;
-  brand: { name: string; logoSrc?: string };
+  brand: TimelineBrand;
   intro: { eyebrow: string; titleHtml: string; subtitle: string };
   outro: { title: string; recap: string[] };
   chapters: string[];
@@ -173,6 +191,9 @@ export interface RenderOptions {
   force?: boolean;
   /** Re-render even if a matching .hash sidecar is found. */
   noCache?: boolean;
+  /** Brand for the title cards, chip, highlights and gradients — `resolveArtifactBrand(config)`
+   * (render/brand.ts). Omitted -> neutral look. */
+  brand?: import("./brand.js").ArtifactBrand;
   ffmpegPath?: string;
   ffprobePath?: string;
   /** Browser pages to render scenes concurrently. Default `min(4, cpus/2)`. */

@@ -3,6 +3,7 @@ version: 1
 title: Update a competitor's phone number
 summary: Find a competitor, open their profile, and change their phone number.
 product: TallyUp
+section: Competitors
 for: Show office staff keeping competitor details current
 start:
   signed_in_as: office_staff

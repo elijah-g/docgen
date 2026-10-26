@@ -43,4 +43,23 @@ describe("retrieve", () => {
     expect(result.topScore).toBe(0);
     expect(result.procedure).toBeUndefined();
   });
+  it("matches a procedure to nested, anchored hit URLs and boosts its library URL for the current screen", () => {
+    const nestedEntries: SearchIndexEntry[] = [
+      { url: "/how-do-i/competitors/add-competitor", title: "Add a competitor", text: "Click Add competitor to create a new competitor record." },
+      { url: "/how-do-i/competitors/add-competitor#search-first", title: "Add a competitor", heading: "Search first", text: "Search competitors before adding." },
+      { url: "/invoices", title: "Invoices", text: "Invoices list every competitor payment received this show." },
+    ];
+    const nestedProcedures: Procedure[] = [{ ...procedures[0], url: "/how-do-i/competitors/add-competitor" }];
+    const result = retrieve("search competitors", nestedEntries, nestedProcedures);
+    expect(result.hits[0].url).toBe("/how-do-i/competitors/add-competitor#search-first");
+    expect(result.procedure?.id).toBe("add-competitor");
+
+    const without = retrieve("competitor", nestedEntries, nestedProcedures);
+    const withBoost = retrieve("competitor", nestedEntries, nestedProcedures, { currentPath: "/competitors" });
+    const score = (r: typeof without) => r.hits.find((h) => h.url === "/how-do-i/competitors/add-competitor#search-first")?.score ?? 0;
+    expect(score(withBoost)).toBeGreaterThan(score(without));
+
+    // A procedures.json without `url` still matches a nested hit by the walkthrough id.
+    expect(retrieve("search competitors", nestedEntries, procedures).procedure?.id).toBe("add-competitor");
+  });
 });

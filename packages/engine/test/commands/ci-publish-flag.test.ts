@@ -40,7 +40,9 @@ function fakeConfig(ci?: ResolvedConfig["ci"]): ResolvedConfig {
   };
 }
 
-describe("runCiCommand — failOnBroken gating", () => {
+// Each test re-imports commands/ci.ts fresh (vi.resetModules) — a cold import of its whole module
+// graph, which can pass 5 s on a busy machine.
+describe("runCiCommand — failOnBroken gating", { timeout: 30_000 }, () => {
   it("is ok even with a broken walkthrough when ci.failOnBroken is unset (default false)", async () => {
     vi.resetModules();
     vi.doMock("../../src/ci/run.js", () => ({ runCi: vi.fn(async () => brokenResult()) }));

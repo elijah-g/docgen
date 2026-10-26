@@ -20,14 +20,17 @@ app's source code, and not the full discover transcript.
    entries", not a technical role string.
 2. **Top tasks.** Per reader, the handful of tasks worth a walkthrough — ranked by how often a
    real user would hit them, not by how interesting they are to write.
-3. **Site layout.** How pages group into chapters/sections in the help site nav.
+3. **Site layout.** How pages group in the help site nav. Each card gets a `section:` — a
+   feature group inside How do I… named after the app's own menu item (`Payments`,
+   `Competitors`), or a top-level category (`Getting started`, `Troubleshooting and FAQ`). See
+   `references/walkthrough-cheatsheet.md` → `section:`.
 4. **Outline cards** — the thing the person actually reviews at checkpoint 1:
 
    ```
    - Add a new competitor and their first entry
-     for: office staff · from Competitors page to a submitted entry
+     for: office staff · section: Competitors · from Competitors page to a submitted entry
    - Record a payment
-     for: office staff · cash, EFTPOS or a payment link
+     for: office staff · section: Payments · cash, EFTPOS or a payment link
    ```
 
 Hand the approved/renamed/removed card list to `docgen` (the router), which fans the approved

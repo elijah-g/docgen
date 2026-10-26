@@ -3,6 +3,7 @@ version: 1
 title: Record a payment
 summary: Record an entry fee a competitor paid at the office.
 product: TallyUp
+section: Payments
 for: Show office staff taking entry fees at the office
 start:
   signed_in_as: office_staff

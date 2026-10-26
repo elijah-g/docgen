@@ -23,6 +23,9 @@
         "for": {
           "type": "string"
         },
+        "section": {
+          "type": "string"
+        },
         "verifiedAgainst": {
           "type": "object",
           "properties": {
@@ -284,7 +287,8 @@
                 ]
               },
               "hold": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0
               },
               "callouts": {
                 "type": "array",

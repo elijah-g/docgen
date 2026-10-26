@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { devOnlyGuard } from "../../_lib/dev-only";
 import { assertStudioRequest } from "../../_lib/security";
-import { isSlug, readPageText } from "../../_lib/server";
+import { isSlug, mtimeOf, readPageText, resolveWalkthroughFile } from "../../_lib/server";
 import { stripMarkers } from "docgen/dist/pages/markers.js";
 
 export async function GET(request: Request) {
@@ -17,5 +17,13 @@ export async function GET(request: Request) {
   if (!file || text === undefined) {
     return NextResponse.json({ found: false });
   }
-  return NextResponse.json({ found: true, file, text, plain: stripMarkers(text) });
+  // builtAt/editedAt let the preview say "built before your latest edits" (step edits land in
+  // the walkthrough file; the page catches up on the next `docgen pages`/`docgen build`).
+  let editedAt: number | undefined;
+  try {
+    editedAt = mtimeOf(resolveWalkthroughFile(id));
+  } catch {
+    editedAt = undefined;
+  }
+  return NextResponse.json({ found: true, file, text, plain: stripMarkers(text), builtAt: mtimeOf(file), editedAt });
 }

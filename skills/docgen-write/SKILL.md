@@ -20,6 +20,8 @@ shared app/db, so capture itself must never run from two subagents at once (see 
    "new" tier comment, from the route path and file it named directly; there's no outline card for
    this case, just one new page to cover. Either way, label the PR `docs:new` when you're done
    (decisions #24) — the reviewer `docgen ci`'s comment names is the app PR's author.
+   Set `section:` from the card (or, for a "new" tier page, from the app's menu item for that
+   route, matching the `section:` other walkthroughs in that area already use).
 2. **Before writing any step**, run `docgen inspect <path> --config <cfg> --json` on the
    walkthrough's start page, and again on every page a step navigates to — never guess a role,
    name, or option label from memory or from reading the app's source. It opens that one page

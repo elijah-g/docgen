@@ -23,6 +23,16 @@ export const docgenPageSchema = pageSchema.extend({
   // until `docgen build`/`docgen pdf` has run at least once.
   pdf: z.string().optional(),
   pdfCard: z.string().optional(),
+  // Library hierarchy (engine index stage): what the page is, where it sits, and what its cards
+  // show. `placeholder` marks a template page docgen may replace; the site hides a placeholder
+  // section that has no pages yet (lib/tree.ts).
+  kind: z.enum(["home", "section", "walkthrough"]).optional(),
+  section: z.string().optional(),
+  steps: z.number().optional(),
+  poster: z.string().optional(),
+  chapters: z.string().optional(),
+  placeholder: z.boolean().optional(),
+  generated: z.boolean().optional(),
 });
 
 const docs = defineDocs({

@@ -3,6 +3,7 @@ version: 1
 title: Find unpaid entries
 summary: Filter the entries list to show only entries that haven't been paid.
 product: TallyUp
+section: Payments
 for: Show office staff following up entry fees
 start:
   signed_in_as: office_staff

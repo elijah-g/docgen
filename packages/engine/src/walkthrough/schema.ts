@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TargetSchema, BoxSchema } from "./target.js";
 import { ActionSchema } from "./action.js";
 import { parseDoString } from "./parse-do.js";
+import { sectionProblems } from "./placement.js";
 import type { Step, Walkthrough } from "./types.js";
 
 const ViewportSchema = z.object({ width: z.number(), height: z.number() }).strict();
@@ -126,7 +127,7 @@ const RawStepSchema = z
     check: z.union([z.string(), z.array(z.string())]).optional(),
     mask: z.array(z.string()).optional(),
     camera: CameraSchema.optional(),
-    hold: z.number().optional(),
+    hold: z.number().min(0, "hold must be 0 or more seconds").optional(),
     callouts: z.array(CalloutSchema).optional(),
     blur: z.array(BlurBoxSchema).optional(),
     actions: z.array(ActionSchema).optional(),
@@ -159,6 +160,14 @@ export const WalkthroughDocSchema = z
     summary: z.string().optional(),
     product: z.string().optional(),
     for: z.string().optional(),
+    // Where the page sits in the help library: a top-level category ("Getting started") or a
+    // feature group inside "How do I…" ("Payments"), nested with " / " — see placement.ts.
+    section: z
+      .string()
+      .superRefine((value, ctx) => {
+        for (const message of sectionProblems(value)) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      })
+      .optional(),
     verifiedAgainst: VerifiedAgainstSchema.optional(),
     start: StartSchema.optional(),
     data: z.record(z.unknown()).optional(),
@@ -223,6 +232,7 @@ export function docToWalkthrough(doc: WalkthroughDoc): Walkthrough {
     summary: doc.summary,
     product: doc.product,
     for: doc.for,
+    ...(doc.section !== undefined ? { section: doc.section } : {}),
     verifiedAgainst: doc.verifiedAgainst,
     start: doc.start,
     data: doc.data,

@@ -40,3 +40,13 @@ export {
 } from "./loader.js";
 export { convertTallyupWorkflow } from "./convert-tallyup.js";
 export { convertPlaywrightFile, type PlaywrightDraft } from "./convert-playwright.js";
+export {
+  libraryPlacement,
+  sectionSlug,
+  sectionSegments,
+  sectionProblems,
+  LIBRARY_CATEGORIES,
+  DEFAULT_CATEGORY_SLUG,
+  type LibraryPlacement,
+  type LibraryCategory,
+} from "./placement.js";

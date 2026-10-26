@@ -41,4 +41,9 @@ describe("parseLlmsTxt / getPageFromLlmsTxt", () => {
   it("returns undefined for an empty llms.txt", () => {
     expect(getPageFromLlmsTxt("", "add-competitor")).toBeUndefined();
   });
+  it("resolves a nested library URL (and a URL with an anchor) by its last segment, the walkthrough id", () => {
+    expect(getPageFromLlmsTxt(llmsTxt, "/how-do-i/competitors/add-competitor")).toContain("Click Add competitor.");
+    expect(getPageFromLlmsTxt(llmsTxt, "/how-do-i/payments/invoices#steps")).toContain("List payments.");
+    expect(getPageFromLlmsTxt(llmsTxt, "/how-do-i/payments/unknown")).toBeUndefined();
+  });
 });

@@ -19,8 +19,14 @@ export interface FrontmatterLinks {
 
 export interface PageFrontmatter {
   title: string;
+  /** The walkthrough summary — shown under the title in the library's page cards. */
+  description?: string;
   for?: string;
   walkthrough: string;
+  /** Reader-facing library path, e.g. "How do I… / Payments" (walkthrough/placement.ts). */
+  section?: string;
+  /** Number of steps in the walkthrough. */
+  steps?: number;
   lastChecked?: string;
   passed: boolean;
   links?: FrontmatterLinks;
@@ -45,8 +51,12 @@ export function escapeMdxText(s: string): string {
 
 export function buildFrontmatterBlock(fm: PageFrontmatter): GeneratedBlock {
   const lines = ["---", `title: ${yamlString(fm.title)}`];
+  if (fm.description) lines.push(`description: ${yamlString(fm.description)}`);
+  lines.push("kind: walkthrough");
   if (fm.for) lines.push(`for: ${yamlString(fm.for)}`);
   lines.push(`walkthrough: ${yamlString(fm.walkthrough)}`);
+  if (fm.section) lines.push(`section: ${yamlString(fm.section)}`);
+  if (fm.steps !== undefined) lines.push(`steps: ${fm.steps}`);
   if (fm.lastChecked) lines.push(`lastChecked: ${yamlString(fm.lastChecked)}`);
   lines.push(`passed: ${fm.passed}`);
   if (fm.links?.video) lines.push(`video: ${yamlString(fm.links.video)}`);

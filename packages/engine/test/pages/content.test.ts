@@ -4,6 +4,7 @@
 // 2. The raw persona role id (`office_staff`) shown to readers instead of a human name.
 import { describe, expect, it } from "vitest";
 import {
+  buildFrontmatterBlock,
   buildBeforeYouStartBlock,
   buildGoodToKnowBlock,
   buildHeaderBlock,
@@ -124,5 +125,33 @@ describe("MDX-unsafe text in generated blocks", () => {
     const block = buildGoodToKnowBlock(walkthrough);
     expect(block!.content).toContain("\\{errors\\}");
     expect(block!.content).toContain("a \\< b");
+  });
+});
+
+describe("buildFrontmatterBlock", () => {
+  it("writes kind, description, section and step count for the library (Contract 3)", () => {
+    const block = buildFrontmatterBlock({
+      title: "Record a payment",
+      description: "Record an entry fee.",
+      for: "Office staff",
+      walkthrough: "record-a-payment",
+      section: "How do I… / Payments",
+      steps: 6,
+      passed: true,
+      links: { video: "../../videos/record-a-payment/record-a-payment.mp4" },
+    });
+    expect(block.content.split("\n")).toEqual([
+      "---",
+      'title: "Record a payment"',
+      'description: "Record an entry fee."',
+      "kind: walkthrough",
+      'for: "Office staff"',
+      'walkthrough: "record-a-payment"',
+      'section: "How do I… / Payments"',
+      "steps: 6",
+      "passed: true",
+      'video: "../../videos/record-a-payment/record-a-payment.mp4"',
+      "---",
+    ]);
   });
 });

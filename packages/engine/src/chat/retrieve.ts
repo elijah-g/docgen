@@ -13,17 +13,26 @@ function boostUrlsFor(currentPath: string | undefined, procedures: Procedure[]):
   const urls = [currentPath];
   for (const proc of procedures) {
     const matches = proc.start.page === currentPath || (proc.impactRoutes ?? []).includes(currentPath);
-    if (matches) urls.push(`/${proc.id}`);
+    if (matches) urls.push(procedureUrl(proc));
   }
   return urls;
 }
 
-/** The procedure whose walkthrough id matches one of the retrieved hits' URLs most closely —
- * matched by url path prefix, since a page's URL is `/<id>` (content/docs/<id>/index.mdx). */
+/** A procedure's page URL: its `url` (the nested library URL, e.g.
+ * "/how-do-i/payments/record-a-payment"), or the legacy flat `/<id>` for a procedures.json
+ * written before pages were nested. */
+export function procedureUrl(proc: Procedure): string {
+  return proc.url ?? `/${proc.id}`;
+}
+
+/** The procedure whose page one of the retrieved hits is on — matched by the page URL (hit URL
+ * without its `#anchor`), falling back to the URL's last segment, which is always the
+ * walkthrough id (walkthrough/placement.ts) — so an older flat `/<id>` index still matches. */
 function matchingProcedure(hits: SearchHit[], procedures: Procedure[], currentPath: string | undefined): Procedure | undefined {
   for (const hit of hits) {
-    const id = hit.url.split("#")[0].replace(/^\//, "");
-    const proc = procedures.find((p) => p.id === id);
+    const pageUrl = hit.url.split("#")[0].replace(/\/+$/, "");
+    const lastSegment = pageUrl.split("/").pop() ?? "";
+    const proc = procedures.find((p) => procedureUrl(p) === pageUrl) ?? procedures.find((p) => p.id === lastSegment);
     if (proc) return proc;
   }
   if (currentPath) {

@@ -45,8 +45,8 @@ export function VersionSwitcher() {
   if (!manifest || manifest.versions.length === 0) return null;
 
   return (
-    <label className="flex items-center gap-2 text-sm text-fd-muted-foreground">
-      <span>Version</span>
+    <label className="flex items-center justify-between gap-2 rounded-[var(--brand-radius)] border border-fd-border bg-fd-card px-2.5 py-1.5 text-xs text-fd-muted-foreground">
+      <span className="font-medium">Version</span>
       <select
         defaultValue="latest"
         onChange={(e) => {
@@ -54,9 +54,9 @@ export function VersionSwitcher() {
           const slug = currentSlugFrom(window.location.pathname);
           window.location.href = target === "latest" ? slug || "/" : `/v/${target}${slug}`;
         }}
-        className="rounded border border-fd-border bg-fd-background px-2 py-1"
+        className="min-w-0 flex-1 truncate bg-transparent text-end text-fd-foreground outline-none"
       >
-        <option value="latest">latest ({manifest.latest})</option>
+        <option value="latest">Latest ({manifest.latest})</option>
         {manifest.versions.map((v) => (
           <option key={v.name} value={v.name}>
             {v.name}

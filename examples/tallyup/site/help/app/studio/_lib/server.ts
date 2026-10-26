@@ -3,14 +3,14 @@
 // conventional `docgen init` layout (docgen.config.ts at the help app root, walkthroughsDir:
 // "./walkthroughs", outDir: ".") and calls straight into the "docgen" engine package for
 // everything else.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 // Deep imports (not the "docgen" package barrel): the barrel's index.ts re-exports the capture/
 // voice/config modules too, and config/load.ts does a non-literal dynamic `import()` that
 // Turbopack/webpack can't trace statically, which breaks bundling route handlers that pull in
 // the barrel. Importing the specific submodules this file needs avoids that entirely.
 import { loadWalkthroughFile, type Walkthrough } from "docgen/dist/walkthrough/index.js";
-import type { CaptureManifest } from "docgen/dist/capture/types.js";
+import type { CaptureManifest, ValidationResult } from "docgen/dist/capture/types.js";
 
 /** The help app root — route handlers run with cwd at the help app root in both `next dev` and
  * `next start`. */
@@ -50,36 +50,68 @@ function assertInside(dir: string, file: string): void {
   }
 }
 
+/** "passed"/"failed" come from the last capture's validation.json; "captured" means a manifest
+ * exists but no validation result; "not-captured" means docgen has never captured it here. */
+export type CaptureStatus = "passed" | "failed" | "captured" | "not-captured";
+
 export interface WalkthroughSummary {
   id: string;
   file: string;
   title: string;
   stepCount: number;
+  /** Contract 3: where the page sits in the help library ("Payments", "Entries / Late entries",
+   * "Getting started"...). Undefined means the default "How do I…" group. */
+  section?: string;
+  summary?: string;
+  status: CaptureStatus;
+  lastChecked?: string;
 }
 
-/** Every walkthrough under walkthroughsDir, parsed enough to list in the Studio sidebar. Files
- * that fail to parse are skipped rather than failing the whole list. */
-export function listWalkthroughs(): WalkthroughSummary[] {
+/** The walkthrough's optional `section:` (Contract 3). Read loosely: the engine's schema gains the
+ * field in the same release, and an older engine build simply never sets it. */
+function sectionOf(wt: Walkthrough): string | undefined {
+  const section = (wt as unknown as { section?: unknown }).section;
+  return typeof section === "string" && section.trim() ? section.trim() : undefined;
+}
+
+/** Every walkthrough file under walkthroughsDir that parses, with its id. Files that fail to
+ * parse are skipped rather than failing the whole list (`docgen validate` reports them). */
+function scanWalkthroughs(): { file: string; wt: Walkthrough }[] {
   const dir = walkthroughsDir();
   if (!existsSync(dir)) return [];
   const files = readdirSync(dir).filter((f) => [".yaml", ".yml"].includes(extname(f)));
-  const out: WalkthroughSummary[] = [];
+  const out: { file: string; wt: Walkthrough }[] = [];
   for (const f of files) {
     const file = join(dir, f);
     try {
-      const wt = loadWalkthroughFile(file);
-      out.push({ id: wt.walkthrough, file, title: wt.title, stepCount: wt.steps.length });
+      out.push({ file, wt: loadWalkthroughFile(file) });
     } catch {
-      // Skip invalid files — the Studio lists what it can; `docgen validate` reports the rest.
+      // Skip invalid files — the Studio lists what it can.
     }
   }
-  return out.sort((a, b) => a.title.localeCompare(b.title));
+  return out;
+}
+
+/** Every walkthrough, with what the Studio's library needs: title, step count, section
+ * (Contract 3) and the last capture's pass/fail + when it was checked. */
+export function listWalkthroughs(): WalkthroughSummary[] {
+  return scanWalkthroughs()
+    .map(({ file, wt }) => ({
+      id: wt.walkthrough,
+      file,
+      title: wt.title,
+      stepCount: wt.steps.length,
+      section: sectionOf(wt),
+      summary: wt.summary,
+      ...(isSlug(wt.walkthrough) ? captureStatus(wt.walkthrough) : { status: "not-captured" as const }),
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** Resolves a walkthrough id to its YAML file, scanning walkthroughsDir. Throws if not found. */
 export function resolveWalkthroughFile(id: string): string {
   assertSlug(id);
-  const match = listWalkthroughs().find((w) => w.id === id);
+  const match = scanWalkthroughs().find((w) => w.wt.walkthrough === id);
   if (!match) throw new Error(`no walkthrough "${id}" under ${walkthroughsDir()}`);
   assertInside(walkthroughsDir(), match.file);
   return match.file;
@@ -170,4 +202,101 @@ export function frameFileFor(id: string, stepNumber: number): string | undefined
   assertInside(framesDir, file);
   if (!existsSync(file)) return undefined;
   return file;
+}
+
+function readJsonIfExists<T>(file: string): T | undefined {
+  if (!existsSync(file)) return undefined;
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Pass/fail and "last checked" for the Studio's status dots and top bar — the same sources, in
+ * the same order, the engine's page builder uses for a page's `lastChecked`/`passed`
+ * (pages/build.ts resolveLastChecked): run.json's ranAt, else validation.json's ranAt. */
+export function captureStatus(id: string): { status: CaptureStatus; lastChecked?: string } {
+  const dir = captureDirFor(id);
+  const validation = readJsonIfExists<ValidationResult>(join(dir, "validation.json"));
+  const run = readJsonIfExists<Record<string, unknown>>(join(dir, "run.json"));
+  const ranAt = run && (typeof run.ranAt === "string" ? run.ranAt : typeof run.capturedAt === "string" ? run.capturedAt : undefined);
+  const lastChecked = ranAt ?? validation?.ranAt;
+  if (validation) return { status: validation.ok ? "passed" : "failed", lastChecked };
+  if (existsSync(join(dir, "manifest.json"))) return { status: "captured", lastChecked };
+  return { status: "not-captured" };
+}
+
+/** The walkthrough's page URL on the help site, for the Studio's "View on help site" link:
+ * `public/procedures.json`'s `url` (Contract 3), else the `public/search-index.json` entry whose
+ * URL ends in the walkthrough id (pages built before the library hierarchy existed), else
+ * undefined (no site page yet — the Studio hides the link). Only ever returns a same-site path. */
+export function siteUrlFor(id: string): string | undefined {
+  assertSlug(id);
+  const publicDir = join(helpRoot(), "public");
+  const procedures = readJsonIfExists<{ id?: unknown; url?: unknown }[]>(join(publicDir, "procedures.json"));
+  const proc = Array.isArray(procedures) ? procedures.find((p) => p && p.id === id) : undefined;
+  if (proc && isSitePath(proc.url)) return proc.url;
+  const index = readJsonIfExists<{ url?: unknown }[]>(join(publicDir, "search-index.json"));
+  if (Array.isArray(index)) {
+    const hit = index.find((e) => e && isSitePath(e.url) && (e.url === `/${id}` || e.url.endsWith(`/${id}`)));
+    if (hit && isSitePath(hit.url)) return hit.url;
+  }
+  return undefined;
+}
+
+function isSitePath(url: unknown): url is string {
+  return typeof url === "string" && url.startsWith("/") && !url.startsWith("//");
+}
+
+/** File modification time (ms) or undefined — lets the Studio say "the page was built before your
+ * latest edits" without the client ever seeing a path. */
+export function mtimeOf(file: string | undefined): number | undefined {
+  if (!file || !existsSync(file)) return undefined;
+  return statSync(file).mtimeMs;
+}
+
+// A screenshot file name as the page builder writes it (pages/content.ts screenshotFile:
+// `step-01.png`), or any other plain image name a person dropped into the folder — never a path.
+const ASSET_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]*\.(png|jpe?g|webp|gif)$/i;
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+/** Resolves an image a built page references (`screenshots/step-01.png`, `./screenshots/x.png`)
+ * to a file inside `pages/<id>/screenshots/` for the Studio's page preview — read-only, and only
+ * ever that one folder: the request names a bare file, which must match ASSET_NAME_PATTERN (no
+ * slashes, no `..`), and the result is re-checked to sit inside the folder. */
+export function pageAssetFile(id: string, name: string): { file: string; contentType: string } | undefined {
+  assertSlug(id);
+  if (!ASSET_NAME_PATTERN.test(name) || name.includes("..")) return undefined;
+  const dir = join(pagesDir(), id, "screenshots");
+  const file = join(dir, name);
+  assertInside(dir, file);
+  if (!existsSync(file)) return undefined;
+  const ext = extname(name).slice(1).toLowerCase();
+  return { file, contentType: IMAGE_TYPES[ext] ?? "application/octet-stream" };
+}
+
+export type VideoKind = "mp4" | "vtt";
+
+/** The walkthrough's rendered video (or its captions) for the Studio's Video tab: the help app's
+ * `public/videos/<id>/` copy (Contract 3) if there is one, else docgen's own output folder
+ * (`<outDir>/videos/<id>/`, outDir "." in a help app). File names are fixed (`<id>.mp4`,
+ * `<id>.vtt`) — nothing from the request beyond the validated id and a two-value kind. */
+export function videoFileFor(id: string, kind: VideoKind): string | undefined {
+  assertSlug(id);
+  const name = `${id}.${kind}`;
+  for (const base of [join(helpRoot(), "public", "videos"), join(helpRoot(), "videos")]) {
+    const dir = join(base, id);
+    const file = join(dir, name);
+    assertInside(dir, file);
+    if (existsSync(file)) return file;
+  }
+  return undefined;
 }

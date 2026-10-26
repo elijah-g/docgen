@@ -2,7 +2,9 @@
 // providers": "Search ... Built in: an index file that ships with the help
 // app; no database"). Consumed client-side by help-app/components/search-box.tsx.
 export interface SearchIndexEntry {
-  /** Page URL, e.g. "/how-do-i/add-competitor". */
+  /** Page URL, e.g. "/how-do-i/add-competitor" — plus the rendered heading's `#anchor` for a
+   * heading entry (e.g. "/how-do-i/add-competitor#before-you-start"). Indexes built before
+   * anchors were added carry the bare page URL; `LexicalSearchProvider` adds the anchor then. */
   url: string;
   /** Page title (frontmatter `title`). */
   title: string;
@@ -10,6 +12,8 @@ export interface SearchIndexEntry {
   heading?: string;
   /** Plain-text content under that heading, truncated to a snippet. */
   text: string;
+  /** Where the page sits in the library, e.g. "How do I… / Payments" (walkthrough pages only). */
+  section?: string;
 }
 
 export interface BuildSearchIndexResult {
@@ -29,6 +33,8 @@ export interface SearchHit {
   title: string;
   heading?: string;
   text: string;
+  /** The page's library path, when the index entry carries one. */
+  section?: string;
   score: number;
 }
 

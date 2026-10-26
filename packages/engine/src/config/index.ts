@@ -15,5 +15,7 @@ export type {
   CaptureSettings,
   ChatConfig,
   ImpactConfig,
+  BrandConfig,
+  BrandColors,
 } from "./types.js";
 export { DEFAULT_MODEL_TIERS, DEFAULT_CAPTURE_SETTINGS, resolveCaptureSettings } from "./types.js";

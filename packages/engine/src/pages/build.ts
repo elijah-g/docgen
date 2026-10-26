@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
-import type { Walkthrough } from "../walkthrough/index.js";
+import { libraryPlacement, type Walkthrough } from "../walkthrough/index.js";
 import type { CaptureManifest, ValidationResult } from "../capture/index.js";
 import { annotateFrame } from "./annotate.js";
 import {
@@ -141,8 +141,11 @@ export async function buildPage(wf: Walkthrough, captureDir: string, outDir: str
   const blocks: GeneratedBlock[] = [
     buildFrontmatterBlock({
       title: wf.title,
+      description: wf.summary?.replace(/\s+/g, " ").trim() || undefined,
       for: wf.for,
       walkthrough: id,
+      section: libraryPlacement(wf.section, id).displayPath,
+      steps: wf.steps.length,
       lastChecked,
       passed,
       links: videoLinks(opts.videoDir, id, pageDir),

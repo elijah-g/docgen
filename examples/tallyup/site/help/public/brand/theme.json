@@ -1,0 +1,7 @@
+{
+  "name": "TallyUp",
+  "primary": "hsl(235 55% 42%)",
+  "primaryForeground": "hsl(0 0% 100%)",
+  "logo": "/brand/logo.png",
+  "fontFamily": "\"Inter\", system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif"
+}

@@ -39,8 +39,17 @@ async function openPage(
   // to an absolute path first — produced `file://dist/videos/...`, which Chromium rejects as an
   // invalid URL (no leading slash). Resolving against `process.cwd()` here matches what the
   // caller meant regardless of which path got us here.
-  await page.goto(`file://${path.resolve(bundleDir, "index.html")}?render=1`);
-  await page.evaluate(() => (document as any).fonts.ready);
+  // `domcontentloaded`, not `load`: player.js may append a brand webfont stylesheet (fontUrl),
+  // and an unreachable font host must not hold up (or time out) the whole render. player.js's
+  // own `window.brandReady` waits for that font + the logo decode with a cap, so the first frame
+  // is painted with the brand font when it's reachable and the system fallback when it isn't.
+  await page.goto(`file://${path.resolve(bundleDir, "index.html")}?render=1`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.resolve((window as any).brandReady).then(() => (document as any).fonts.ready),
+      new Promise((r) => setTimeout(r, 10_000)),
+    ]),
+  );
   return page;
 }
 

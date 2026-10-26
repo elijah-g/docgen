@@ -1,5 +1,6 @@
 import { loadWalkthroughFile } from "../walkthrough/index.js";
-import { loadNarrationBeats, render, type RenderResult } from "../render/index.js";
+import { loadNarrationBeats, render, resolveArtifactBrand, type RenderResult } from "../render/index.js";
+import { loadConfig } from "../config/index.js";
 
 export interface RunRenderOptions {
   capture: string;
@@ -11,6 +12,8 @@ export interface RunRenderOptions {
   noCache?: boolean;
   /** Browser pages to render scenes concurrently (M10). Default `min(4, cpus/2)`. */
   concurrency?: number;
+  /** docgen config whose `brand` styles the video (colours, font, logo). Omitted -> neutral look. */
+  configPath?: string;
 }
 
 export async function runRender(walkthroughFile: string, opts: RunRenderOptions, json: boolean): Promise<number> {
@@ -21,7 +24,9 @@ export async function runRender(walkthroughFile: string, opts: RunRenderOptions,
 
   let result: RenderResult;
   try {
+    const brand = opts.configPath ? resolveArtifactBrand(await loadConfig(opts.configPath)) : undefined;
     result = await render(wf, {
+      brand,
       outDir,
       captureDir: opts.capture,
       narration,

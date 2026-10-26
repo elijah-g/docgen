@@ -1,7 +1,7 @@
 // The Studio (M9): a dev-only `/studio` route that edits the help app's own repo files directly
 // (Keystatic/TinaCMS style) — see docs/scope.md "The Studio" and decisions #9/#19. Phase 1 scope:
-// edit walkthrough step fields (say/caption/page_text/title/hold) and page text. Timeline,
-// callouts and blur are Phase 2.
+// edit walkthrough step fields (say/caption/page_text/title/hold), callouts and blur boxes
+// (M22), with a preview of the built page/video and the edit history.
 //
 // Dev-only by contract (AGENTS.md: "the Studio is a dev-only /studio route") — this guard is the
 // enforcement point: anything under app/studio/** must stay unreachable in a production build, so
@@ -10,6 +10,9 @@
 import { StudioApp } from "@/components/studio/StudioApp";
 import { assertDevPage } from "./_lib/dev-only";
 import { getStudioToken } from "./_lib/security";
+import "./studio.css";
+
+export const metadata = { title: "Studio" };
 
 export default function StudioPage() {
   assertDevPage();

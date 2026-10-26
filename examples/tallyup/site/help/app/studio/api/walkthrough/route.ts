@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { devOnlyGuard } from "../../_lib/dev-only";
 import { assertStudioRequest } from "../../_lib/security";
-import { isSlug, loadWalkthroughById, readManifest, resolveWalkthroughFile } from "../../_lib/server";
+import {
+  captureStatus,
+  isSlug,
+  loadWalkthroughById,
+  readManifest,
+  resolveWalkthroughFile,
+  siteUrlFor,
+  videoFileFor,
+} from "../../_lib/server";
 
 export async function GET(request: Request) {
   const guard = devOnlyGuard();
@@ -29,7 +37,16 @@ export async function GET(request: Request) {
         blur: s.doc.blur ?? [],
       })),
     };
-    return NextResponse.json({ walkthrough, file, manifest });
+    // Top-bar facts: pass/fail + last checked, where the page lives on the help site (hidden
+    // when unknown), and whether a rendered video exists for the Page/Video preview toggle.
+    return NextResponse.json({
+      walkthrough,
+      file,
+      manifest,
+      ...captureStatus(id),
+      siteUrl: siteUrlFor(id),
+      hasVideo: Boolean(videoFileFor(id, "mp4")),
+    });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 404 });
   }

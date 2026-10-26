@@ -2,14 +2,23 @@
 // `config.helpApp` is set) copies each walkthrough's generated page into the help app's content
 // tree. See docs/scope.md "Swappable providers" (search: "an index file that ships with the
 // help app; no database") and "Working with any agent".
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { buildSearchIndex } from "../index-search/index.js";
 import type { BuildPageResult } from "../pages/index.js";
 import { buildProcedures } from "../procedures/index.js";
 import type { Procedure } from "../procedures/index.js";
-import type { Walkthrough } from "../walkthrough/index.js";
+import { libraryPlacement, type LibraryPlacement, type Walkthrough } from "../walkthrough/index.js";
 import type { ResolvedChatConfig } from "../chat/index.js";
+import { readFrontmatter, setFrontmatterFields, type FrontmatterValue } from "../pages/frontmatter.js";
+import {
+  findStagedPages,
+  linkOrCopy,
+  mostCommonProduct,
+  removeStagedPage,
+  writeLibraryStructure,
+  type StagedPage,
+} from "./library.js";
 
 /** Reads a JSON array file if it exists and parses as an array; `undefined` if missing or
  * malformed (treated the same as "no prior procedures.json" rather than failing the build). */
@@ -23,7 +32,7 @@ function readJsonArrayIfExists<T>(file: string): T[] | undefined {
   }
 }
 
-/** Header prepended (after any frontmatter) to every page mirrored into `content/docs/<id>` —
+/** Header prepended (after any frontmatter) to every page mirrored into `content/docs/` —
  * that tree is generated output, never a place to hand-edit (review finding index-stage.ts:20). */
 function generatedHeader(id: string): string {
   // MDX-safe comment (not an HTML `<!-- -->` comment, which MDX's parser rejects — same fix
@@ -49,37 +58,158 @@ function markGenerated(destFile: string, id: string): void {
  * see pages/build.ts). Stage only the real page file (+ non-markdown assets like screenshots)
  * into the content tree the search index is built from, so a page is never double-counted.
  *
- * `content/docs/<id>` is generated output, not a place a person edits (the source of truth is
+ * A page is staged into its library folder (`placement.dir`, e.g.
+ * `how-do-i/payments/record-a-payment` — walkthrough/placement.ts), and every other copy of the
+ * same walkthrough's page (an old section, or the legacy flat `content/docs/<id>/`) is removed.
+ * The content tree is generated output, not a place a person edits (the source of truth is
  * `pages/<id>/index.mdx` — see `markGenerated` above). A non-publishable page is never staged —
  * and any stale copy from an earlier, passing build is removed — so a failed run can never leave
  * personal data, secrets, or a broken page visible in the sidebar/static params (review finding
  * index-stage.ts:68).
  */
-function stagePageContent(pagesDir: string, contentDir: string, page: BuildPageResult): void {
-  const dest = join(contentDir, page.id);
+function stagePageContent(
+  pagesDir: string,
+  contentDir: string,
+  page: BuildPageResult,
+  placement: LibraryPlacement,
+  existing: StagedPage[],
+): string | "missing" | undefined {
   if (!page.publishable) {
-    rmSync(dest, { recursive: true, force: true });
-    return;
+    for (const copy of existing) removeStagedPage(copy.dir);
+    return undefined;
   }
   const src = join(pagesDir, page.id);
-  if (!existsSync(src)) return;
-  rmSync(dest, { recursive: true, force: true });
-  mkdirSync(dirname(dest), { recursive: true });
+  if (!existsSync(src)) return "missing"; // nothing to stage — leave whatever is published alone
+  for (const copy of existing) removeStagedPage(copy.dir);
+  const dest = join(contentDir, ...placement.dir.split("/"));
+  mkdirSync(dest, { recursive: true });
   const plainBasename = basename(page.plainFile);
-  cpSync(src, dest, { recursive: true, filter: (candidate) => basename(candidate) !== plainBasename });
-  markGenerated(join(dest, basename(page.indexFile)), page.id);
+  const skip = new Set([plainBasename, `${basename(page.indexFile)}.docgen.json`]);
+  cpSync(src, dest, { recursive: true, filter: (candidate) => !skip.has(basename(candidate)) });
+  const destFile = join(dest, basename(page.indexFile));
+  markGenerated(destFile, page.id);
+  return destFile;
 }
 
-/** Removes `content/docs/<id>` directories whose walkthrough no longer exists on disk — so
- * deleting a walkthrough's `.yaml` file actually removes its page, instead of leaving an orphan
- * around forever (review finding index-stage.ts:20). */
-function pruneDeletedWalkthroughs(contentDir: string, validIds: ReadonlySet<string>): void {
-  if (!existsSync(contentDir)) return;
-  for (const entry of readdirSync(contentDir, { withFileTypes: true })) {
-    if (entry.isDirectory() && !validIds.has(entry.name)) {
-      rmSync(join(contentDir, entry.name), { recursive: true, force: true });
+/** Moves a page staged by an earlier run into its current library folder (its walkthrough's
+ * `section:` changed, or it's still in the legacy flat `content/docs/<id>/` layout) — so the
+ * library stays consistent even for walkthroughs this run didn't rebuild. */
+function relocateStagedPage(contentDir: string, page: StagedPage, placement: LibraryPlacement): string {
+  const dest = join(contentDir, ...placement.dir.split("/"));
+  if (resolve(dest) === resolve(page.dir)) return page.file;
+  mkdirSync(dest, { recursive: true });
+  const name = basename(page.file);
+  cpSync(page.file, join(dest, name));
+  if (existsSync(join(page.dir, "screenshots"))) {
+    rmSync(join(dest, "screenshots"), { recursive: true, force: true });
+    cpSync(join(page.dir, "screenshots"), join(dest, "screenshots"), { recursive: true });
+  }
+  removeStagedPage(page.dir);
+  return join(dest, name);
+}
+
+const MEDIA_FILES = (id: string): [string, string][] => [
+  ["video", `${id}.mp4`],
+  ["vtt", `${id}.vtt`],
+  ["srt", `${id}.srt`],
+  ["chapters", `${id}.chapters.vtt`],
+];
+
+/**
+ * Puts a staged page's video, captions and chapter list under `<publicDir>/videos/<id>/` (hardlinked
+ * from the render when possible — a render can be tens of MB) and points the page's `video`/`vtt`/
+ * `srt`/`chapters` frontmatter at those site URLs; a page with no render loses the keys instead
+ * of keeping a link that can't resolve. With no `videoDir` (e.g. `docgen ci` publish, which never
+ * renders), whatever an earlier build already put under `public/videos/<id>/` is linked. The
+ * `poster` is the page's most detailed step screenshot, served from `/screenshots/<id>/`.
+ */
+function stageMedia(id: string, pageFile: string, publicDir: string, videoDir: string | undefined): Record<string, FrontmatterValue> {
+  const fields: Record<string, FrontmatterValue> = {};
+  const destDir = join(publicDir, "videos", id);
+  const sameDir = videoDir !== undefined && resolve(join(videoDir, id)) === resolve(destDir);
+  for (const [key, file] of MEDIA_FILES(id)) {
+    const dest = join(destDir, file);
+    if (videoDir && !sameDir) {
+      const src = join(videoDir, id, file);
+      if (existsSync(src)) {
+        mkdirSync(destDir, { recursive: true });
+        linkOrCopy(src, dest);
+      } else {
+        rmSync(dest, { force: true });
+      }
+    }
+    fields[key] = existsSync(dest) ? `/videos/${id}/${file}` : null;
+  }
+
+  // Poster: the step screenshot with the most visual detail (largest file; earliest on a tie) —
+  // a first step is often a half-loaded screen or a spinner.
+  const shotsDir = join(dirname(pageFile), "screenshots");
+  const shots = existsSync(shotsDir) ? readdirSync(shotsDir).filter((n) => /\.(png|jpe?g|webp)$/i.test(n)).sort() : [];
+  let poster: string | undefined;
+  let posterSize = -1;
+  for (const name of shots) {
+    const size = statSync(join(shotsDir, name)).size;
+    if (size > posterSize) {
+      poster = name;
+      posterSize = size;
     }
   }
+  if (poster) {
+    const dest = join(publicDir, "screenshots", id, poster);
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(join(shotsDir, poster), dest); // small — a plain copy, never a hardlink into content/
+    fields.poster = `/screenshots/${id}/${poster}`;
+  } else {
+    fields.poster = null;
+  }
+  return fields;
+}
+
+/** Removes `<publicDir>/videos/<id>/` — for a walkthrough that's no longer published. Never
+ * touches the render itself (skipped when the render dir *is* that folder). */
+function removePublishedMedia(publicDir: string, id: string, videoDir: string | undefined): void {
+  const dir = join(publicDir, "videos", id);
+  if (videoDir && resolve(join(videoDir, id)) === resolve(dir)) return;
+  rmSync(dir, { recursive: true, force: true });
+}
+
+/** Points a staged page at its current library spot and media (see `stageMedia`), and fills in
+ * the library fields from its walkthrough — so a page the pages stage skipped as unchanged (built
+ * by an older docgen, before these fields existed) still carries them. */
+function finishStagedPage(
+  file: string,
+  id: string,
+  placement: LibraryPlacement | undefined,
+  media: Record<string, FrontmatterValue> | undefined,
+  wf: Walkthrough | undefined,
+): void {
+  if (!existsSync(file)) return;
+  const raw = readFileSync(file, "utf8");
+  const summary = wf?.summary?.replace(/\s+/g, " ").trim();
+  const next = setFrontmatterFields(raw, {
+    ...(readFrontmatter(raw).walkthrough === id ? {} : { walkthrough: id }),
+    kind: "walkthrough",
+    ...(summary ? { description: summary } : {}),
+    ...(placement ? { section: placement.displayPath } : {}),
+    ...(wf ? { steps: wf.steps.length } : {}),
+    ...(media ?? {}),
+  });
+  if (next !== raw) writeFileSync(file, next, "utf8");
+}
+
+/** Removes every staged walkthrough page whose walkthrough no longer exists on disk — so deleting
+ * a walkthrough's `.yaml` file actually removes its page, instead of leaving an orphan around
+ * forever (review finding index-stage.ts:20). Pages are found by their `walkthrough:` frontmatter
+ * wherever they sit; category folders, section folders and human pages are never touched. */
+function pruneDeletedWalkthroughs(contentDir: string, validIds: ReadonlySet<string>): string[] {
+  const removed: string[] = [];
+  for (const page of findStagedPages(contentDir)) {
+    if (!validIds.has(page.id)) {
+      removeStagedPage(page.dir);
+      removed.push(page.id);
+    }
+  }
+  return removed;
 }
 
 /** Removes `<publicDir>/screenshots/<id>` for any id that's no longer publishable — either this
@@ -115,7 +245,7 @@ export interface IndexStageOptions {
   helpApp?: string;
   pages: BuildPageResult[];
   /** Every walkthrough id that currently exists on disk (not just the ones this run selected) —
-   * used to prune `content/docs/<id>` for a walkthrough that's been deleted. Omit to skip
+   * used to prune the staged page of a walkthrough that's been deleted. Omit to skip
    * pruning (e.g. in tests that don't model the full walkthrough set). */
   walkthroughIds?: string[];
   /** `<outDir>/videos` (or helpApp's) — step video-time offsets in procedures.json come from
@@ -134,6 +264,12 @@ export interface IndexStageOptions {
    * decisions.md #40 (owner's key only, never committed). Omit to skip writing the file (chat
    * then falls back to its own built-in defaults). */
   chatConfig?: ResolvedChatConfig;
+  /** Every walkthrough on disk (not just this run's) — gives each page its library placement
+   * (`section:`), lets pages this run didn't rebuild move when their section changed, and names
+   * the product on the home page. Walkthroughs in `procedureSources` are used too. */
+  walkthroughs?: Walkthrough[];
+  /** Product name for the home page when no walkthrough sets `product` (e.g. config.brand.name). */
+  productName?: string;
 }
 
 export interface IndexStageResult {
@@ -155,11 +291,7 @@ export interface IndexStageResult {
  * ones this run rebuilt (review finding index-stage.ts:75: `docgen build foo` must not drop
  * every other walkthrough's llms.txt section). */
 function publishedIds(contentDir: string): string[] {
-  if (!existsSync(contentDir)) return [];
-  return readdirSync(contentDir, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name)
-    .sort();
+  return [...new Set(findStagedPages(contentDir).map((p) => p.id))].sort();
 }
 
 // `index.plain.md` is `stripMarkers(text)` of the full page (pages/build.ts) — markers stripped,
@@ -202,10 +334,56 @@ export function runIndexStage(opts: IndexStageOptions): IndexStageResult {
   const contentDir = opts.helpApp ? join(opts.helpApp, "content", "docs") : join(opts.outDir, ".search-content");
   const publicDir = opts.helpApp ? join(opts.helpApp, "public") : opts.outDir;
 
-  for (const p of opts.pages) stagePageContent(opts.pagesDir, contentDir, p);
+  const walkthroughs = new Map<string, Walkthrough>();
+  for (const wf of opts.walkthroughs ?? []) walkthroughs.set(wf.walkthrough, wf);
+  for (const s of opts.procedureSources ?? []) walkthroughs.set(s.walkthrough.walkthrough, s.walkthrough);
+  const placements = new Map<string, LibraryPlacement>();
+  for (const [id, wf] of walkthroughs) placements.set(id, libraryPlacement(wf.section, id));
+  const placementFor = (id: string): LibraryPlacement => placements.get(id) ?? libraryPlacement(undefined, id);
+  const videoDir = opts.helpApp ? opts.videoDir : undefined;
 
+  // 1. This run's pages: staged fresh into their library folder (or removed when not publishable).
+  const existingCopies = new Map<string, StagedPage[]>();
+  for (const page of findStagedPages(contentDir)) {
+    existingCopies.set(page.id, [...(existingCopies.get(page.id) ?? []), page]);
+  }
+  for (const p of opts.pages) {
+    const placement = placementFor(p.id);
+    const file = stagePageContent(opts.pagesDir, contentDir, p, placement, existingCopies.get(p.id) ?? []);
+    if (file === "missing") continue;
+    existingCopies.delete(p.id);
+    if (!file) {
+      if (opts.helpApp) removePublishedMedia(publicDir, p.id, videoDir);
+      continue;
+    }
+    finishStagedPage(file, p.id, placement, opts.helpApp ? stageMedia(p.id, file, publicDir, videoDir) : undefined, walkthroughs.get(p.id));
+  }
+
+  // 2. Pages this run didn't rebuild: move to their current spot when the walkthrough is known.
+  for (const [id, copies] of existingCopies) {
+    const placement = placements.get(id);
+    if (!placement || (opts.walkthroughIds && !opts.walkthroughIds.includes(id))) continue;
+    const keep = copies.find((c) => c.rel === placement.dir) ?? copies[0];
+    for (const copy of copies) if (copy !== keep) removeStagedPage(copy.dir);
+    const file = relocateStagedPage(contentDir, keep, placement);
+    finishStagedPage(file, id, placement, opts.helpApp ? stageMedia(id, file, publicDir, videoDir) : undefined, walkthroughs.get(id));
+  }
+
+  // 3. Walkthroughs deleted from disk.
   if (opts.walkthroughIds) {
-    pruneDeletedWalkthroughs(contentDir, new Set(opts.walkthroughIds));
+    const removed = pruneDeletedWalkthroughs(contentDir, new Set(opts.walkthroughIds));
+    if (opts.helpApp) for (const id of removed) removePublishedMedia(publicDir, id, videoDir);
+  }
+
+  // 4. The library around the pages: section folders, their index pages and sidebar order, the
+  //    root order and the home page. Only for a real help app — the no-help-app search staging
+  //    dir just needs the pages themselves.
+  if (opts.helpApp) {
+    writeLibraryStructure({
+      contentDir,
+      placements,
+      product: mostCommonProduct([...walkthroughs.values()].map((w) => w.product)) ?? opts.productName,
+    });
   }
 
   mkdirSync(publicDir, { recursive: true });

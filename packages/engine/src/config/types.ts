@@ -204,14 +204,59 @@ export interface ChatConfig {
   trustProxyHeader?: string;
 }
 
-/** Help-app theme, guessed by `extractBrand()` (src/init/brand.ts) or set by hand. */
+/**
+ * Theme colours. Values are any CSS colour (hex, `rgb()`, `hsl()`, `oklch()`) or a bare HSL
+ * triplet like `235 55% 42%` (shadcn convention) — wrap with `toCssColor()` (src/theme/color.ts)
+ * before use.
+ */
+export interface BrandColors {
+  /** Main brand colour (buttons, links, active nav). */
+  primary?: string;
+  /** Text on `primary`. */
+  primaryForeground?: string;
+  /** Second brand colour (highlights, video gradients, badges). */
+  accent?: string;
+  /** Page canvas. */
+  background?: string;
+  /** Body text. */
+  foreground?: string;
+  /** Raised surfaces (cards, popovers). */
+  card?: string;
+  /** Muted fills. */
+  muted?: string;
+  /** Secondary text. */
+  mutedForeground?: string;
+  border?: string;
+}
+
+/** Help-app theme, guessed by `extractBrand()` (src/init/brand.ts) or set by hand. `docgen theme`
+ * and every `docgen build` turn it into the help app's `app/brand.css`, `lib/brand.json` and
+ * `public/brand/*` (src/theme/write.ts). */
 export interface BrandConfig {
-  /** CSS colour value (hex or `H S% L%` HSL triplet) used for `--primary` in the help app. */
+  /** Product name, e.g. "TallyUp". */
+  name?: string;
+  /** Main brand colour (same as `colors.primary`; wins when both are set). */
   primaryColor?: string;
+  /** Second brand colour (same as `colors.accent`; wins when both are set). */
+  accentColor?: string;
+  /** Light theme colours. */
+  colors?: BrandColors;
+  /** Dark theme overrides; derived from the light theme when unset (never copied from it). */
+  dark?: BrandColors;
   /** Path to a logo file, relative to the config file (usually under `public/`). */
   logo?: string;
+  /** Logo for dark backgrounds (e.g. a white logo), relative to the config file. */
+  logoDark?: string;
+  /** Square mark / favicon source, relative to the config file. */
+  icon?: string;
   /** Font family name, e.g. "Inter" or "Geist". */
   font?: string;
+  /** Stylesheet URL that loads the font (e.g. a Google Fonts css2 URL). */
+  fontUrl?: string;
+  /** Heading font family name, when different from `font`. */
+  headingFont?: string;
+  /** Corner radius, e.g. "0.5rem" or "10px". */
+  radius?: string;
 }
 
 /** The shape a user's `docgen.config.ts`/`.mjs` default-exports (via `defineConfig`). */

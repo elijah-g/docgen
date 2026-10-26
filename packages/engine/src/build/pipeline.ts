@@ -13,6 +13,7 @@ import type { CaptureManifest, FrameDiffSummary, ValidationResult } from "../cap
 import { resolveCaptureSettings } from "../config/types.js";
 import { buildVoiceManifest } from "../commands/voice.js";
 import { loadNarrationBeats, render } from "../render/index.js";
+import { resolveArtifactBrand } from "../render/brand.js";
 import type { RenderResult } from "../render/index.js";
 import { buildPage } from "../pages/index.js";
 import type { BuildPageResult } from "../pages/index.js";
@@ -31,6 +32,7 @@ import type { Browser } from "playwright";
 import { resolveChatConfig } from "../chat/index.js";
 import { cpSync, rmSync } from "node:fs";
 import { runIndexStage } from "./index-stage.js";
+import { writeHelpAppTheme } from "../theme/index.js";
 import type { IndexStageResult } from "./index-stage.js";
 import { manifestHash, readHashCache, sha256, stableStringify, writeHashCache } from "./hash.js";
 import { buildModelsSection } from "./report.js";
@@ -220,7 +222,13 @@ async function runRenderStage(
   const started = Date.now();
   try {
     const narration = loadNarrationBeats(state.voiceDir);
-    const result = await render(wf, { outDir: state.videoDir, captureDir: state.captureDir, narration, draft });
+    const result = await render(wf, {
+      outDir: state.videoDir,
+      captureDir: state.captureDir,
+      narration,
+      draft,
+      brand: resolveArtifactBrand(config),
+    });
     state.renderResult = result;
     state.stages.render = result.skipped
       ? skipped(`unchanged (${result.durationSec.toFixed(1)}s)`, Date.now() - started)
@@ -264,6 +272,7 @@ export function pagesInputHash(
     title: wf.title,
     summary: wf.summary,
     for: wf.for,
+    section: wf.section,
     intro: wf.intro,
     outro: wf.outro,
     start: wf.start,
@@ -551,6 +560,18 @@ export async function runPipeline(config: ResolvedConfig, opts: BuildOptions): P
     for (const state of states) state.stages.pdf = notSelected();
   }
 
+  // Help-app theme: keep the site's colours, logo and font in step with config.brand on every
+  // build (app/brand.css, lib/brand.json, public/brand/). Unchanged files aren't rewritten, so a
+  // running `next dev` doesn't reload for nothing. A missing logo file is a warning, not a failure.
+  if (config.helpApp && stages.has("index")) {
+    try {
+      const theme = writeHelpAppTheme(config, config.helpApp);
+      for (const warning of theme.warnings) console.warn(`docgen build: theme: ${warning}`);
+    } catch (err) {
+      console.warn(`docgen build: theme not written: ${(err as Error).message}`);
+    }
+  }
+
   // Index: once, over every walkthrough's page.
   let indexStage: StageResult;
   let indexResult: (ReturnType<typeof runIndexStage> & { ms: number }) | undefined;
@@ -573,9 +594,21 @@ export async function runPipeline(config: ResolvedConfig, opts: BuildOptions): P
     // selected this run — so the index stage can prune a deleted walkthrough's content/docs
     // entry without touching any walkthrough this run didn't happen to build (review finding
     // index-stage.ts:20).
-    const allWalkthroughIds = findWalkthroughFiles(config.walkthroughsDir, []).map((f) =>
-      basename(f).replace(/\.(ya?ml)$/i, ""),
-    );
+    const allWalkthroughFiles = findWalkthroughFiles(config.walkthroughsDir, []);
+    const allWalkthroughIds = allWalkthroughFiles.map((f) => basename(f).replace(/\.(ya?ml)$/i, ""));
+    // Every walkthrough on disk, loaded, so the index stage can place each page in the library by
+    // its `section:` (and move a page this run didn't rebuild when its section changed). A file
+    // that doesn't load is skipped here — its own build already reports why.
+    const allWalkthroughs = allWalkthroughFiles.flatMap((f) => {
+      const id = basename(f).replace(/\.(ya?ml)$/i, "");
+      const selected = states.find((s) => s.wf.walkthrough === id)?.wf;
+      if (selected) return [selected];
+      try {
+        return [loadWalkthroughFile(f)];
+      } catch {
+        return [];
+      }
+    });
     try {
       const result = runIndexStage({
         pagesDir: join(config.outDir, "pages"),
@@ -591,6 +624,8 @@ export async function runPipeline(config: ResolvedConfig, opts: BuildOptions): P
         // index-stage.ts:179/:152).
         procedureSources: states.filter((s) => s.pageResult).map((s) => ({ walkthrough: s.wf, captureDir: s.captureDir })),
         chatConfig: resolveChatConfig(config.chat, config.models),
+        walkthroughs: allWalkthroughs,
+        productName: config.brand?.name,
       });
       indexResult = { ...result, ms: Date.now() - started };
       indexStage = ok(`${result.pageCount} page(s) indexed -> ${result.searchIndexFile}`);

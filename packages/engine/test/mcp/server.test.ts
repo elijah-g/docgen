@@ -75,7 +75,9 @@ describe("docgen MCP server", () => {
   it("list_walkthroughs returns every walkthrough's id, title and audience", async () => {
     const result = await client.callTool({ name: "list_walkthroughs", arguments: {} });
     const list = JSON.parse(textOf(result as never));
-    expect(list).toEqual([{ id: "add-competitor", title: "Add a competitor", for: "office staff", start: { page: "/competitors", role: "office-staff" } }]);
+    expect(list).toEqual([
+      { id: "add-competitor", title: "Add a competitor", url: "/add-competitor", for: "office staff", start: { page: "/competitors", role: "office-staff" } },
+    ]);
     await close();
   });
 

@@ -8,13 +8,28 @@ export interface PdfPaperSettings {
   paper: "A4" | "Letter";
 }
 
-/** Brand bits carried into the print HTML — same source as the help app's theme (config.brand). */
+/** Brand carried into the print HTML — same source as the help app's theme (config.brand).
+ * `resolveArtifactBrand(config)` (render/brand.ts) returns a full one; every field is optional so
+ * older hand-built brands (`{ primaryColor, logoPath, font }`) keep working. */
 export interface PdfBrand {
-  /** CSS colour value for headings/callouts/footer rule. */
+  /** Product name for the cover, headers and the card strip. */
+  name?: string;
+  /** CSS colour value (or bare HSL triplet) — legacy alias for `colors.primary`. */
   primaryColor?: string;
-  /** Absolute path to a logo image file, or undefined. */
+  colors?: Partial<import("../render/brand.js").ArtifactColors>;
+  /** Absolute path to the logo for light backgrounds. */
   logoPath?: string;
+  /** Absolute path to the logo for dark backgrounds (cover band). */
+  logoDarkPath?: string;
+  /** Pre-inlined (downscaled) `data:` URLs for the two logos — build.ts fills these in once per
+   * run so every page/header reuses one small image instead of the original file. */
+  logoSrc?: string;
+  logoDarkSrc?: string;
   font?: string;
+  headingFont?: string;
+  /** https stylesheet loading `font`/`headingFont`. */
+  fontUrl?: string;
+  configured?: boolean;
 }
 
 export interface BuildPdfOptions {
@@ -57,6 +72,10 @@ export interface ManualBuildResult {
 export interface PdfPageInput {
   id: string;
   title: string;
+  /** The walkthrough's `product` — wins over the brand name in headers when set. */
+  product?: string;
+  /** Library section (walkthrough `section:`), used to group the manual's contents. */
+  section?: string;
   summary?: string;
   for?: string;
   /** Plain Markdown with docgen's generated-block markers already stripped (pages' index.plain.md). */

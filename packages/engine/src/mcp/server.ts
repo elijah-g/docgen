@@ -40,8 +40,8 @@ export function createDocgenMcpServer(source: DocgenMcpSource): McpServer {
     "get_page",
     {
       title: "Get page",
-      description: "Returns one help page's content as plain Markdown, given its URL (e.g. \"/add-competitor\").",
-      inputSchema: { slug: z.string().describe('Page URL, e.g. "/add-competitor"') },
+      description: "Returns one help page's content as plain Markdown, given its URL (e.g. \"/how-do-i/competitors/add-competitor\") or walkthrough id.",
+      inputSchema: { slug: z.string().describe('Page URL, e.g. "/how-do-i/competitors/add-competitor", or a walkthrough id') },
     },
     async ({ slug }) => {
       const markdown = await source.getPageMarkdown(slug);
@@ -56,11 +56,11 @@ export function createDocgenMcpServer(source: DocgenMcpSource): McpServer {
     "list_walkthroughs",
     {
       title: "List walkthroughs",
-      description: "Lists every published walkthrough: id, title, and who it's for.",
+      description: "Lists every published walkthrough: id, title, page URL, and who it's for.",
       inputSchema: {},
     },
     async () => {
-      const list = source.procedures.map((p) => ({ id: p.id, title: p.title, for: p.for, start: p.start }));
+      const list = source.procedures.map((p) => ({ id: p.id, title: p.title, url: p.url ?? `/${p.id}`, for: p.for, start: p.start }));
       return textResult(JSON.stringify(list, null, 2));
     },
   );

@@ -77,3 +77,69 @@ describe("buildCardHtml", () => {
     expect(html).toContain("&lt;iframe");
   });
 });
+
+describe("brand in the print HTML", () => {
+  const brand = {
+    name: "TallyUp",
+    colors: { primary: "hsl(235 55% 42%)", accent: "hsl(183 68% 30%)" },
+    font: "Inter",
+    fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@400;700",
+    logoSrc: "data:image/png;base64,AAAA",
+  };
+
+  it("sets the brand colours and font as CSS variables, and loads the webfont under a scoped CSP", () => {
+    const html = buildPageHtml(pageInput(), brand);
+    expect(html).toContain("--primary: hsl(235 55% 42%)");
+    expect(html).toContain("--accent: hsl(183 68% 30%)");
+    expect(html).toContain('"Inter", system-ui');
+    expect(html).toContain('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700">');
+    expect(html).toMatch(/style-src 'unsafe-inline' https:\/\/fonts\.googleapis\.com;/);
+    expect(html).toMatch(/font-src file: data: https:;/);
+    expect(html).toMatch(/script-src 'none'/);
+  });
+
+  it("falls back to the neutral palette and no font link without a brand", () => {
+    const html = buildPageHtml(pageInput());
+    expect(html).toContain("--primary: hsl(235 55% 42%)");
+    expect(html).not.toContain("<link");
+    expect(html).toMatch(/font-src file: data:;/);
+  });
+
+  it("turns 'N. Title' step headings into number badges", () => {
+    const html = buildPageHtml(pageInput({ markdown: "# T\n\nSummary.\n\n#### 2. Click Save\n\nClick it.\n" }));
+    expect(html).toContain('<h4 class="step-h"><span class="step-num">2</span><span>Click Save</span></h4>');
+    expect(html).toContain('<p class="lede">Summary.</p>');
+  });
+
+  it("puts the logo, product name, title and date on the manual cover", () => {
+    const html = buildCoverHtml("Help guide", "2026-10-26", brand, { guideCount: 4 });
+    expect(html).toContain("data:image/png;base64,AAAA");
+    expect(html).toContain("TallyUp");
+    expect(html).toContain("Help guide");
+    expect(html).toContain("26 October 2026");
+    expect(html).toContain("@page { margin: 0; }");
+  });
+
+  it("brands the quick-reference card's header strip", () => {
+    const html = buildCardHtml("Record a payment", [{ number: 1, title: "Open", text: "Open it." }], brand, {});
+    expect(html).toContain('class="strip"');
+    expect(html).toContain("Quick reference");
+    expect(html).toContain("TallyUp");
+    expect(html).toContain("data:image/png;base64,AAAA");
+  });
+
+  it("uses the walkthrough's product name on the card when the brand has none", () => {
+    const html = buildCardHtml("Record a payment", [], undefined, { productName: "Widget" });
+    expect(html).toContain("<span>Widget</span>");
+  });
+
+  it("groups the contents by library section when walkthroughs have one", () => {
+    const html = buildTocHtml([
+      { title: "Record a payment", reader: "Office staff", section: "Payments / Fees", summary: "Take a fee.", page: 3 },
+      { title: "Add a competitor", reader: "Office staff", page: 5 },
+    ]);
+    expect(html).toContain("<h2>Payments › Fees</h2>");
+    expect(html).toContain("<h2>Office staff</h2>");
+    expect(html).toContain('<p class="toc-sum">Take a fee.</p>');
+  });
+});

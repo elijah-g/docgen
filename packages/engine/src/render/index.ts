@@ -27,6 +27,18 @@ export { beatIds, buildTimeline } from "./timeline.js";
 export { captionsFor, toSrt, toVtt, toChaptersVtt, wrapCaption, wrapCaptions } from "./captions.js";
 export { computeContentHash, matchesCachedHash, writeHashSidecar, hashSidecarPath } from "./hash.js";
 export { writePlayerBundle } from "./bundle.js";
+export {
+  resolveArtifactBrand,
+  timelineBrand,
+  cssColor,
+  fontStack,
+  imageDataUrl,
+  brandFingerprint,
+  NEUTRAL_COLORS,
+  type ArtifactBrand,
+  type ArtifactColors,
+  type BrandConfigLike,
+} from "./brand.js";
 export { loadNarrationBeats } from "./voice-input.js";
 export { qualityFor, renderFrames, renderStills, muxVideo } from "./video.js";
 export { buildNarrationTrack } from "./audio.js";
@@ -79,7 +91,7 @@ export async function render(wf: Walkthrough, options: RenderOptions): Promise<R
   const draft = Boolean(options.draft);
   const quality = qualityFor(draft, options.fps);
   const frameSrc = (f: string) => path.join(options.captureDir, "frames", f);
-  const timeline = buildTimeline(wf, manifest, options.narration, { fps: quality.fps, frameSrc });
+  const timeline = buildTimeline(wf, manifest, options.narration, { fps: quality.fps, frameSrc, brand: options.brand });
 
   const stepOutDir = path.join(options.outDir, id);
   await mkdir(stepOutDir, { recursive: true });

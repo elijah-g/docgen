@@ -10,6 +10,7 @@ import { runRender } from "./commands/render.js";
 import { runCaptureCommand } from "./commands/capture.js";
 import { runInspectCommand } from "./commands/inspect.js";
 import { runInit } from "./commands/init.js";
+import { runTheme } from "./commands/theme.js";
 import { runPages } from "./commands/pages.js";
 import { runQaCommand } from "./commands/qa.js";
 import { runBuild } from "./commands/build.js";
@@ -134,8 +135,10 @@ program
   .option("-o, --out-dir <dir>", "output dir (default dist/videos)")
   .option("--force", "render even if capture validation failed")
   .option("--no-cache", "re-render even if a matching .hash sidecar exists")
+  .option("--config <path>", "docgen config whose brand (colours, logo, font) styles the video")
   .option("--json", "print a single JSON object instead of a summary")
   .action(async (walkthrough: string, opts: {
+    config?: string;
     capture: string;
     voice: string;
     draft?: boolean;
@@ -153,6 +156,7 @@ program
       outDir: opts.outDir,
       force: Boolean(opts.force),
       noCache: !opts.cache,
+      configPath: opts.config,
     }, Boolean(opts.json));
   });
 
@@ -415,6 +419,17 @@ program
       );
     },
   );
+
+program
+  .command("theme [dir]")
+  .description("rewrite the help app's theme files (app/brand.css, lib/brand.json, public/brand/) from docgen.config's brand")
+  .option("--config <path>", "path to docgen.config.ts/.mjs (default: <dir>/docgen.config.* or <dir>/help/docgen.config.*)")
+  .option("--detect", "re-detect the brand from the app and print a suggested brand block (writes nothing)")
+  .option("--app-repo <path>", "app repo to detect from with --detect (default: impact.appRepo, else the config's directory)")
+  .option("--json", "print a single JSON object instead of a summary")
+  .action(async (dir: string | undefined, opts: { config?: string; detect?: boolean; appRepo?: string; json?: boolean }) => {
+    process.exitCode = await runTheme({ dir, config: opts.config, detect: Boolean(opts.detect), appRepo: opts.appRepo }, Boolean(opts.json));
+  });
 
 program
   .command("ci")

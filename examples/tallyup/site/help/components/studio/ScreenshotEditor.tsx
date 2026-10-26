@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "@/lib/cn";
+import { screenshotUrl, STUDIO_TOKEN_HEADER, useStudioBlob } from "./api";
+import { Icon, Spinner } from "./icons";
 import type { StudioBlur, StudioBox, StudioCallout, StudioManifestStep, StudioStep, StudioTarget } from "./types";
-
-const STUDIO_TOKEN_HEADER = "x-docgen-studio-token";
 
 type Mode = "callout" | "blur";
 
@@ -64,6 +64,7 @@ export function ScreenshotEditor({
   viewport,
   studioToken,
   onChanged,
+  onError,
 }: {
   walkthroughId: string;
   step: StudioStep;
@@ -72,43 +73,34 @@ export function ScreenshotEditor({
   viewport?: { width: number; height: number };
   studioToken: string;
   onChanged: () => void;
+  /** Where save errors go (the Studio's toasts); falls back to an inline message. */
+  onError?: (message: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("callout");
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [error, setError] = useState<string>();
-  const [imgUrl, setImgUrl] = useState<string>();
+  const [inlineError, setInlineError] = useState<string>();
+  const [busy, setBusy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const hasImage = Boolean(manifestStep?.image);
 
   // A plain <img src="..."> can't carry the Studio token header assertStudioRequest requires
-  // (security.ts), so the screenshot is fetched here instead and handed to <img> as a blob URL.
-  useEffect(() => {
-    if (!hasImage) return;
-    let cancelled = false;
-    let objectUrl: string | undefined;
-    fetch(`/studio/api/screenshot?id=${encodeURIComponent(walkthroughId)}&step=${stepNumber}`, {
-      headers: { [STUDIO_TOKEN_HEADER]: studioToken },
-    })
-      .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setImgUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setImgUrl(undefined);
-      });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [walkthroughId, stepNumber, studioToken, hasImage]);
+  // (security.ts), so the screenshot is fetched with it and handed to <img> as a blob URL.
+  const image = useStudioBlob(hasImage ? screenshotUrl(walkthroughId, stepNumber) : undefined, studioToken);
+
+  const setError = (message: string | undefined) => {
+    if (message && onError) onError(message);
+    else setInlineError(message);
+  };
 
   if (!manifestStep?.image || !viewport) {
     return (
-      <p className="rounded-md border border-dashed border-fd-border p-3 text-xs text-fd-muted-foreground">
-        No captured screenshot for this step yet — run <code>docgen capture</code> to add callouts or blur boxes here.
-      </p>
+      <div className="flex items-start gap-3 rounded-lg border border-dashed border-fd-border bg-fd-muted/40 p-3 text-xs text-fd-muted-foreground">
+        <Icon name="image" className="mt-0.5 size-4 shrink-0" />
+        <p>
+          No captured screenshot for this step yet. Run <code className="studio-code">npx docgen capture</code> and you can add numbered
+          callouts and blur boxes here.
+        </p>
+      </div>
     );
   }
 
@@ -127,6 +119,7 @@ export function ScreenshotEditor({
   });
 
   function post<T>(body: unknown): Promise<T> {
+    setBusy(true);
     return fetch("/studio/api/edit", {
       method: "POST",
       headers: { "content-type": "application/json", [STUDIO_TOKEN_HEADER]: studioToken },
@@ -135,7 +128,7 @@ export function ScreenshotEditor({
       const data = (await res.json()) as T & { ok?: boolean; error?: string };
       if (!res.ok || data.ok === false) throw new Error(data.error ?? `${res.status}`);
       return data;
-    });
+    }).finally(() => setBusy(false));
   }
 
   function pointerToViewportPx(e: ReactPointerEvent<HTMLDivElement>): { x: number; y: number } {
@@ -166,18 +159,18 @@ export function ScreenshotEditor({
       mode === "callout"
         ? { action, walkthroughId, stepId: step.id, callout: { id, ...pinFields } satisfies StudioCallout }
         : { action, walkthroughId, stepId: step.id, blur: { id, ...pinFields } satisfies StudioBlur };
-    post(payload).then(onChanged).catch((err) => setError(String(err)));
+    post(payload).then(onChanged).catch((err: Error) => setError(err.message));
   }
 
   function removeItem(kind: Mode, itemId: string) {
     const action = kind === "callout" ? "removeCallout" : "removeBlur";
-    post({ action, walkthroughId, stepId: step.id, itemId }).then(onChanged).catch((err) => setError(String(err)));
+    post({ action, walkthroughId, stepId: step.id, itemId }).then(onChanged).catch((err: Error) => setError(err.message));
   }
 
   function setLabel(itemId: string, label: string) {
     post({ action: "updateCallout", walkthroughId, stepId: step.id, itemId, patch: { label } })
       .then(onChanged)
-      .catch((err) => setError(String(err)));
+      .catch((err: Error) => setError(err.message));
   }
 
   function move(itemId: string, dir: -1 | 1) {
@@ -187,43 +180,68 @@ export function ScreenshotEditor({
     if (i < 0 || j < 0 || j >= ids.length) return;
     const newOrder = [...ids];
     [newOrder[i], newOrder[j]] = [newOrder[j], newOrder[i]];
-    post({ action: "reorderCallouts", walkthroughId, stepId: step.id, newOrder }).then(onChanged).catch((err) => setError(String(err)));
+    post({ action: "reorderCallouts", walkthroughId, stepId: step.id, newOrder }).then(onChanged).catch((err: Error) => setError(err.message));
   }
 
   const draftPin = draft ? draftToPin(draft, manifestStep.highlights, highlightTargets) : null;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 text-xs">
-        <span className="font-medium text-fd-muted-foreground">Click or drag on the screenshot to add:</span>
-        <button
-          type="button"
-          onClick={() => setMode("callout")}
-          className={cn("rounded-full px-2 py-0.5", mode === "callout" ? "bg-red-600 text-white" : "border border-fd-border")}
-        >
-          Numbered callout
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("blur")}
-          className={cn("rounded-full px-2 py-0.5", mode === "blur" ? "bg-slate-700 text-white" : "border border-fd-border")}
-        >
-          Blur box
-        </button>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="text-xs font-semibold">Screenshot</h3>
+        <div role="radiogroup" aria-label="What a click adds" className="flex rounded-lg bg-fd-muted p-0.5 text-xs">
+          {(
+            [
+              ["callout", "Numbered callout"],
+              ["blur", "Blur box"],
+            ] as const
+          ).map(([m, label]) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={mode === m}
+              onClick={() => setMode(m)}
+              className={cn(
+                "studio-focus flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors",
+                mode === m ? "studio-surface text-fd-foreground shadow-sm" : "text-fd-muted-foreground hover:text-fd-foreground",
+              )}
+            >
+              <span className={cn("size-2.5 rounded-full", m === "callout" ? "bg-red-600" : "bg-slate-500")} aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-fd-muted-foreground">
+          Click a highlighted element to pin to it, or drag to draw a box.
+        </span>
+        {busy ? <Spinner className="ml-auto size-3.5 text-fd-muted-foreground" /> : null}
       </div>
 
       <div
         ref={wrapRef}
-        className="relative w-full cursor-crosshair select-none overflow-hidden rounded-md border border-fd-border"
+        className="relative w-full cursor-crosshair touch-none select-none overflow-hidden rounded-lg border border-fd-border bg-fd-muted shadow-sm"
         style={{ aspectRatio: `${viewport.width} / ${viewport.height}` }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- dev-only Studio, blob URL from our own fetch */}
-        {imgUrl ? (
-          <img src={imgUrl} alt={`Step ${stepNumber} screenshot`} className="absolute inset-0 h-full w-full" draggable={false} />
+        {image.status === "ready" ? (
+          // eslint-disable-next-line @next/next/no-img-element -- dev-only Studio, blob URL from our own fetch
+          <img src={image.src} alt={`Step ${stepNumber} screenshot`} className="absolute inset-0 h-full w-full" draggable={false} />
+        ) : image.status === "loading" ? (
+          <div className="studio-skeleton absolute inset-0 rounded-none" />
         ) : null}
+
+        {/* Elements docgen already knows the box of — a click inside one pins to it. */}
+        {(manifestStep.highlights ?? []).map((b, i) => (
+          <div
+            key={`hl-${i}`}
+            className="pointer-events-none absolute rounded-sm border border-dashed border-sky-500/70 bg-sky-400/5"
+            style={toFraction(b)}
+            aria-hidden
+          />
+        ))}
 
         {blurBoxes.map((b) => {
           // A box-pinned item shows immediately from its own authored box (no capture needed);
@@ -233,16 +251,18 @@ export function ScreenshotEditor({
           return (
             <div
               key={b.id}
-              className={cn("group absolute border-2 bg-slate-900/40", b.target ? "border-amber-400" : "border-slate-500")}
+              className={cn("group absolute rounded-sm border-2 bg-slate-900/45 backdrop-blur-[3px]", b.target ? "border-amber-400" : "border-slate-400")}
               style={toFraction(box)}
               title={b.target ? "Pinned to an element — follows it when the layout moves" : "Fixed position"}
             >
               <button
                 type="button"
+                aria-label="Remove blur box"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => removeItem("blur", b.id)}
-                className="absolute -right-2 -top-2 hidden h-5 w-5 rounded-full bg-slate-700 text-[10px] text-white group-hover:block"
+                className="absolute -right-2.5 -top-2.5 hidden size-5 items-center justify-center rounded-full bg-slate-800 text-white shadow group-hover:flex"
               >
-                ×
+                <Icon name="x" className="size-3" />
               </button>
             </div>
           );
@@ -254,13 +274,13 @@ export function ScreenshotEditor({
           return (
             <div
               key={c.id}
-              className="group absolute"
+              className={cn("group absolute rounded-sm border-2", c.target ? "border-amber-500/80" : "border-red-600/80")}
               style={toFraction(box)}
               title={c.target ? "Pinned to an element — follows it when the layout moves" : "Fixed position"}
             >
               <span
                 className={cn(
-                  "absolute -left-3 -top-3 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white shadow",
+                  "absolute -left-3 -top-3 flex size-6 items-center justify-center rounded-full text-xs font-bold text-white shadow-md ring-2 ring-white",
                   c.target ? "bg-amber-500" : "bg-red-600",
                 )}
               >
@@ -268,10 +288,12 @@ export function ScreenshotEditor({
               </span>
               <button
                 type="button"
+                aria-label={`Remove callout ${i + 1}`}
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => removeItem("callout", c.id)}
-                className="absolute -right-2 -top-2 hidden h-5 w-5 rounded-full bg-red-800 text-[10px] text-white group-hover:block"
+                className="absolute -right-2.5 -top-2.5 hidden size-5 items-center justify-center rounded-full bg-red-800 text-white shadow group-hover:flex"
               >
-                ×
+                <Icon name="x" className="size-3" />
               </button>
             </div>
           );
@@ -280,43 +302,94 @@ export function ScreenshotEditor({
         {draftPin ? (
           <div
             className={cn(
-              "pointer-events-none absolute border-2 border-dashed",
-              draftPin.target ? "border-amber-400" : mode === "callout" ? "border-red-500" : "border-slate-400",
+              "pointer-events-none absolute rounded-sm border-2 border-dashed",
+              draftPin.target ? "border-amber-400 bg-amber-300/10" : mode === "callout" ? "border-red-500 bg-red-500/10" : "border-slate-400 bg-slate-500/20",
             )}
             style={toFraction(draftPin.box)}
           />
         ) : null}
       </div>
 
-      {error ? <p className="text-xs text-red-600">{error}</p> : null}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-fd-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm border border-dashed border-sky-500" /> Known element
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-amber-500" /> Pinned to an element (follows layout changes)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-red-600" /> Fixed position
+        </span>
+      </div>
+
+      {inlineError ? <p className="text-xs text-red-600 dark:text-red-400">{inlineError}</p> : null}
 
       {callouts.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-xs">
+        <ul className="divide-y divide-fd-border overflow-hidden rounded-lg border border-fd-border text-xs">
           {callouts.map((c, i) => (
-            <li key={c.id} className="flex items-center gap-1">
-              <span className="w-4 font-semibold text-red-600">{i + 1}.</span>
-              <span title={c.target ? "Pinned to an element" : "Fixed position"}>{c.target ? "📌" : "▫️"}</span>
+            <li key={c.id} className="flex items-center gap-2 studio-surface px-2.5 py-1.5">
+              <span
+                className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white",
+                  c.target ? "bg-amber-500" : "bg-red-600",
+                )}
+              >
+                {i + 1}
+              </span>
+              <span className="shrink-0 text-fd-muted-foreground" title={c.target ? "Pinned to an element" : "Fixed position"}>
+                <Icon name={c.target ? "pin" : "square"} className="size-3.5" />
+              </span>
               <input
                 defaultValue={c.label ?? ""}
-                placeholder="label (optional)"
-                className="flex-1 rounded border border-fd-border bg-transparent px-1 py-0.5"
+                placeholder="Label (optional)"
+                aria-label={`Callout ${i + 1} label`}
+                className="studio-input h-7 min-w-0 flex-1 px-2"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
                 onBlur={(e) => {
                   if (e.target.value !== (c.label ?? "")) setLabel(c.id, e.target.value);
                 }}
               />
-              <button type="button" onClick={() => move(c.id, -1)} disabled={i === 0} className="disabled:opacity-30">
-                ↑
-              </button>
-              <button type="button" onClick={() => move(c.id, 1)} disabled={i === callouts.length - 1} className="disabled:opacity-30">
-                ↓
-              </button>
-              <button type="button" onClick={() => removeItem("callout", c.id)} className="text-red-600">
-                remove
-              </button>
+              <div className="flex shrink-0 items-center">
+                <IconButton label="Move up" icon="arrowUp" onClick={() => move(c.id, -1)} disabled={i === 0} />
+                <IconButton label="Move down" icon="arrowDown" onClick={() => move(c.id, 1)} disabled={i === callouts.length - 1} />
+                <IconButton label="Remove callout" icon="trash" onClick={() => removeItem("callout", c.id)} danger />
+              </div>
             </li>
           ))}
         </ul>
       ) : null}
     </div>
+  );
+}
+
+function IconButton({
+  label,
+  icon,
+  onClick,
+  disabled,
+  danger,
+}: {
+  label: string;
+  icon: "arrowUp" | "arrowDown" | "trash";
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "studio-focus flex size-7 items-center justify-center rounded-md text-fd-muted-foreground transition-colors disabled:pointer-events-none disabled:opacity-30",
+        danger ? "hover:bg-red-500/10 hover:text-red-600" : "hover:bg-fd-muted hover:text-fd-foreground",
+      )}
+    >
+      <Icon name={icon} className="size-3.5" />
+    </button>
   );
 }

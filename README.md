@@ -61,7 +61,8 @@ through its isolated demo environment).
 
 | Command | Does |
 | --- | --- |
-| `init` | Scaffold the help app into `<dir>/help`, with brand colours and logo guessed from the app |
+| `init` | Scaffold the help app into `<dir>/help`, with brand colours (light and dark), fonts and logos read from the app |
+| `theme` | Rewrite the help app's theme from the config's `brand`; `--detect` prints a fresh brand block from the app |
 | `digest` | Compact map of an app's routes, roles and on-screen labels (monorepos via `--app`, detail via `--area`) |
 | `inspect` | Open one page signed in and list its interactive elements; read-only |
 | `validate`, `import tallyup`, `import playwright` | Check walkthrough files; convert TallyUp's `workflow.json` or existing Playwright tests into draft walkthroughs |

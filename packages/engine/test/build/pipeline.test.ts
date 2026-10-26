@@ -5,7 +5,7 @@
 //  9. buildPage must be called with `readers: config.readers`.
 // 10. render/pages must be skipped when this run's capture validation (or voice) failed.
 // 11. voice (the one built-in paid stage) must stop once the run budget is exceeded.
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rm } from "node:fs/promises";
@@ -234,8 +234,11 @@ describe("runPipeline (review-finding regressions)", () => {
     });
 
     expect(result.walkthroughs[0].stages.qa?.status).toBe("failed");
-    expect(result.index?.pageCount).toBe(0);
+    // Only the generated home page is indexed — never the QA-failed walkthrough's page.
+    const searchIndex = JSON.parse(readFileSync(join(helpApp, "public", "search-index.json"), "utf8")) as { url: string }[];
+    expect(searchIndex.some((e) => e.url.includes("flaky-qa"))).toBe(false);
     expect(existsSync(join(helpApp, "content", "docs", "flaky-qa"))).toBe(false);
+    expect(existsSync(join(helpApp, "content", "docs", "how-do-i", "flaky-qa"))).toBe(false);
   });
 
   it("bug 8: videoPresent checks <videoDir>/<id>/<id>.mp4, not <videoDir>/<id>.mp4 (affects the pages-stage cache key)", async () => {

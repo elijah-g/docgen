@@ -18,6 +18,10 @@ export interface ProcedureStep {
 export interface Procedure {
   id: string;
   title: string;
+  /** The walkthrough page's site URL, e.g. "/how-do-i/payments/record-a-payment"
+   * (walkthrough/placement.ts). Missing from a procedures.json written before pages were nested —
+   * readers fall back to `/<id>`. */
+  url?: string;
   /** Who the walkthrough is for (Walkthrough.for), when set. */
   for?: string;
   start: {

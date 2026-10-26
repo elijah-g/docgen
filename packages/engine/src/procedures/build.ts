@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Walkthrough } from "../walkthrough/index.js";
+import { libraryPlacement, type Walkthrough } from "../walkthrough/index.js";
 import type { CaptureManifest, ValidationResult } from "../capture/index.js";
 import { stripMarkdown } from "../index-search/index.js";
 import { screenshotFile } from "../pages/content.js";
@@ -105,6 +105,7 @@ export function buildProcedure(
   return {
     id,
     title: wf.title,
+    url: libraryPlacement(wf.section, id).url,
     ...(wf.for ? { for: wf.for } : {}),
     start: {
       page: wf.start?.page,

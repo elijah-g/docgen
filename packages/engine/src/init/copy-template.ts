@@ -15,6 +15,10 @@ export const TEMPLATE_DIR = join(here, "..", "..", "..", "help-app");
 // `docgen.config.ts` is deliberately excluded from the plain copy: `write-config.ts` is the sole
 // writer of that file, since it needs to fill in the detected app URL and brand per-repo.
 const SKIP_NAMES = new Set(["node_modules", ".next", ".build", ".docgen-session", "next-env.d.ts", "docgen.config.ts"]);
+// Brand assets the theme writer (src/theme/write.ts) copies per app — never carry one app's logo
+// from the template into another. `app/brand.css` / `lib/brand.json` are still copied as the
+// neutral defaults; `docgen init` then rewrites them from the detected brand.
+const SKIP_REL_PATHS = new Set([join("public", "brand")]);
 
 export interface CopyTemplateResult {
   /** Files written, relative to `destDir`. */
@@ -28,6 +32,7 @@ function listFiles(dir: string, base: string, out: string[]): void {
     if (SKIP_NAMES.has(entry.name)) continue;
     const abs = join(dir, entry.name);
     const rel = join(base, entry.name);
+    if (SKIP_REL_PATHS.has(rel)) continue;
     if (entry.isDirectory()) {
       listFiles(abs, rel, out);
     } else if (entry.isFile()) {

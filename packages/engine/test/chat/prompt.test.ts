@@ -25,6 +25,12 @@ const context: RetrievedContext = {
 };
 
 describe("buildCitations", () => {
+  it("cites the procedure's library URL when procedures.json has one, else the legacy /<id>", () => {
+    expect(buildCitations(context)[0].url).toBe("/add-competitor");
+    const nested = { ...context, procedure: { ...context.procedure!, url: "/how-do-i/competitors/add-competitor" } };
+    expect(buildCitations(nested)[0].url).toBe("/how-do-i/competitors/add-competitor");
+  });
+
   it("numbers the procedure first, then each hit, in order", () => {
     const citations = buildCitations(context);
     expect(citations.map((c) => c.n)).toEqual([1, 2]);

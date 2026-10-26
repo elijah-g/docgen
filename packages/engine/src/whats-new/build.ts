@@ -4,14 +4,13 @@
 // plus a trailing "general" bucket, written through the same generated/human-edit marker
 // scheme every other page uses (pages/markers.ts) so a person's hand edits to the page survive
 // a rerun.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   FRONTMATTER_KEY,
   mergeBlocks,
   readSidecar,
   sidecarPath,
-  stripMarkers,
   writeSidecar,
   type GeneratedBlock,
 } from "../pages/markers.js";
@@ -80,7 +79,9 @@ export async function buildWhatsNew(opts: BuildWhatsNewOptions): Promise<BuildWh
   const { text, sidecar, suggestions } = mergeBlocks(existing, blocks, sidecarIn);
 
   writeFileSync(indexFile, text.endsWith("\n") ? text : `${text}\n`);
-  writeFileSync(plainFile, stripMarkers(text).replace(/\n{3,}/g, "\n\n"));
+  // No `index.plain.md` here: this folder is the site's content tree, where Fumadocs would serve
+  // it as a second page (`/whats-new/index.plain`). Remove one an older version wrote.
+  rmSync(plainFile, { force: true });
   writeSidecar(indexFile, sidecar);
 
   return {

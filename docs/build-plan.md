@@ -59,6 +59,7 @@ TallyUp's page, screenshots, video and captions from one command.
 | M20 | Playwright test import: turn existing Playwright tests into walkthrough drafts | done | `docgen import playwright <glob>`: TS compiler API, one draft per `test()`, locator chains to target hints, unmappable calls kept as `# TODO from test:` comments, emails/phones masked. emh-check: 42 specs to 343 drafts, all valid; 35% of calls mapped (schema has no press/hover/focus, many custom helpers, negated asserts) | Phase 2 |
 | M21 | Versioned docs + What's new: release tag freezes a version; chat and agent connector answer per version; What's new page from merged PRs | done | `docgen version freeze|list` snapshots search index, procedures and llms.txt to `public/versions/<name>` + versions.json; `/v/<name>/...` routes and a version switcher; chat (`version` in body) and MCP (`?version=`) answer per version, unknown version lists the known ones. `docgen whats-new` writes What's new from app-repo git log or `gh pr list`, chores filtered, human edits kept. Orchestrator fixed: newest named version read the current build; unsafe version names; history read from the config's folder instead of the app repo | Phase 2 |
 | M22 | Studio Phase 2: numbered callouts and blur boxes pinned to targets, hold times, simple timeline | done | Per-step `callouts` (numbered, labelled) and `blur` boxes, each pinned to a target or a fixed box; capture resolves targets to boxes per step; pages and video burn them in. Blur collapses the box to one colour (mosaic of 1 cell), so nothing is recoverable. Studio: click a highlighted element to pin (`target:`), drag for a fixed box, label, reorder, delete; step timeline; all through shared edit actions with undo, plus `docgen edit`. Orchestrator review found published procedure screenshots copied raw frames (bypassing blur); fixed with a test that scans every output for raw bytes | Phase 2 |
+| M23 | Polish: on-brand site, Studio and artifacts; library hierarchy | done | Brand detection (name, light/dark colours, accent, radius, font + URL, logo, dark logo, icon) feeds `app/brand.css`, `lib/brand.json`, `public/brand/` (`docgen theme`, every build). Walkthrough `section:` places pages in Getting started / How do I… / … with section pages, generated home, nested URLs (old `/<id>` redirects). Site: home with search and topics, section card grids, guide header (checked badge, steps, audience, print/PDF/card), video chapters, step badges, framed zoomable screenshots, ⌘K search over the index, branded chat and drop-in widget. Studio: branded shell, library by section with status, step cards with autosave, thumbnail timeline, real page preview, video tab, history. Video player and PDFs (cover, contents by section, running headers) take the brand; neutral fallback | Phase 1 polish |
 
 ## Log
 
@@ -98,8 +99,12 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - 2026-10-25 · M18 done after review (baselines from the help app on disk so diffs are real; CI database from the app's migrations, no training dump; fork PRs and shell-injection hardening). Full suite 909 pass / 11 skipped; typecheck clean.
 - 2026-10-25 · TallyUp pilot validated end to end from a clean clone of main: CI database from tracked migrations (three training-only SQL functions recreated from tracked files), runner-local Postgres with SSL, baselines re-taken from main (old ones came from the training branch), `docgen ci` resets demo data before every walkthrough, seed rows given fixed ids (random tiebreak reordered lists).
 - 2026-10-25 · M19 done after review (repair workflow refuses fork PR code; publish job commits only the docs folder). Full suite 945 pass / 11 skipped. All milestones M0–M22 done; live GitHub run pending a test PR.
+- 2026-10-26 · M23 done (four builders in parallel: brand/theme, video + PDF brand, library hierarchy, Studio; orchestrator built the site). Full suite 1053 pass / 11 skipped; typecheck clean; skills 64/64; TallyUp example `next build` passes.
 
 ## Follow-ups
+
+- Brand assets in examples/tallyup point at the TallyUp checkout next to this repo; without it the last copied files in `public/brand/` are kept.
+- `docgen ci --publish` only moves the pages it rebuilt when a walkthrough's `section:` changes; a full `docgen build` moves the rest.
 
 - Cold draft render is ~59 s; typing and scrolling frames are the unskippable rest (incremental reruns are fast: 23 s with changed frames, 33 ms unchanged). Re-measure capture and render on a quiet machine.
 - Capture screenshots dominate capture time (~1 s each at device scale 2); not re-measured in M16.
@@ -114,5 +119,4 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Publish-on-merge commits to main, which redeploys hosts that build on every push (TallyUp's Amplify).
 - TallyUp CI schema: `get_show_id_for_entry()` has no tracked definition (training only); its index is skipped in CI.
 - Scaffolded help apps don't update when the template changes (examples/tallyup was missing M21/M22 until synced by hand): add `docgen upgrade` (scope.md risks table).
-- Studio page preview shows raw frontmatter, literal `<strong>` tags and broken image links; the Welcome page stays the template placeholder after `docgen build`.
 - Phase 1 gate needs an outside vibe coder.

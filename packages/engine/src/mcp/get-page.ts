@@ -26,11 +26,14 @@ export function parseLlmsTxt(llmsTxt: string): Map<string, string> {
   return byId;
 }
 
-/** `slug` is a page URL (e.g. "/add-competitor" or "add-competitor") — matched against the
- * walkthrough id llms.txt sections are keyed by. Returns `undefined` (so the tool reports "not
- * found") for both a missing page and one whose section body is empty. */
+/** `slug` is a page URL (e.g. "/how-do-i/payments/record-a-payment", the legacy flat
+ * "/record-a-payment", or a bare "record-a-payment") — matched against the walkthrough id
+ * llms.txt sections are keyed by. A walkthrough page's folder is always its id
+ * (walkthrough/placement.ts), so a nested URL resolves by its last segment. Returns `undefined`
+ * (so the tool reports "not found") for both a missing page and one whose section body is empty. */
 export function getPageFromLlmsTxt(llmsTxt: string, slug: string): string | undefined {
-  const id = slug.replace(/^\//, "").split("#")[0];
-  const content = parseLlmsTxt(llmsTxt).get(id);
+  const path = slug.split("#")[0].split("?")[0].replace(/^\/+|\/+$/g, "");
+  const sections = parseLlmsTxt(llmsTxt);
+  const content = sections.get(path) ?? sections.get(path.split("/").pop() ?? path);
   return content ? content : undefined;
 }

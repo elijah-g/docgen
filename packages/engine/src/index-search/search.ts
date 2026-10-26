@@ -35,6 +35,8 @@ interface Doc {
   tokens: string[];
   termFreq: Map<string, number>;
   url: string;
+  /** `url` without its `#anchor` — what a boost URL (a page) is compared against. */
+  pageUrl: string;
 }
 
 const K1 = 1.5;
@@ -56,8 +58,9 @@ export class LexicalSearchProvider implements SearchProvider {
       const tokens = tokenize(`${entry.title} ${entry.heading ?? ""} ${entry.text}`);
       const termFreq = new Map<string, number>();
       for (const t of tokens) termFreq.set(t, (termFreq.get(t) ?? 0) + 1);
-      const url = entry.heading ? `${entry.url}#${slugify(entry.heading)}` : entry.url;
-      return { entry, tokens, termFreq, url };
+      // A current index already carries the heading's anchor in `url`; an older one doesn't.
+      const url = entry.heading && !entry.url.includes("#") ? `${entry.url}#${slugify(entry.heading)}` : entry.url;
+      return { entry, tokens, termFreq, url, pageUrl: url.split("#")[0] };
     });
     const seen = new Map<string, Set<number>>();
     this.docs.forEach((doc, i) => {
@@ -87,7 +90,7 @@ export class LexicalSearchProvider implements SearchProvider {
         const denom = tf + K1 * (1 - B + B * (doc.tokens.length / Math.max(this.avgLen, 1)));
         score += idf * ((tf * (K1 + 1)) / Math.max(denom, 1e-9));
       }
-      if (score > 0 && (boost.has(doc.entry.url) || boost.has(doc.url))) score *= 1.5;
+      if (score > 0 && (boost.has(doc.pageUrl) || boost.has(doc.url))) score *= 1.5;
       return { doc, score };
     });
 
@@ -100,6 +103,7 @@ export class LexicalSearchProvider implements SearchProvider {
         title: doc.entry.title,
         heading: doc.entry.heading,
         text: doc.entry.text,
+        ...(doc.entry.section ? { section: doc.entry.section } : {}),
         score,
       }));
   }

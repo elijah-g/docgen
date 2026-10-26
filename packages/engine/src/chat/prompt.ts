@@ -41,7 +41,7 @@ export function buildCitations(context: RetrievedContext): ChatCitation[] {
   const citations: ChatCitation[] = [];
   let n = 1;
   if (context.procedure) {
-    citations.push({ n: n++, url: `/${context.procedure.id}`, title: context.procedure.title });
+    citations.push({ n: n++, url: context.procedure.url ?? `/${context.procedure.id}`, title: context.procedure.title });
   }
   for (const hit of context.hits) {
     citations.push({ n: n++, url: hit.url, title: hit.title, heading: hit.heading });

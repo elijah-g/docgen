@@ -13,6 +13,7 @@ import type {
   TimelineHighlight,
   TimelineScene,
 } from "./types.js";
+import { timelineBrand, type ArtifactBrand } from "./brand.js";
 
 const T = {
   fade: 0.35,
@@ -52,6 +53,8 @@ const escapeHtml = (s: string): string =>
 export interface BuildTimelineOptions {
   fps: number;
   frameSrc?: (image: string) => string;
+  /** `resolveArtifactBrand(config)` — colours, font and logo for the title cards etc. */
+  brand?: ArtifactBrand;
 }
 
 /** Builds the deterministic Timeline the player renders, from a Walkthrough + its capture + narration. */
@@ -73,9 +76,9 @@ export function buildTimeline(
     viewport: { w: VW, h: VH },
     stage: { x: 132, y: 24, w: 1656, h: 931.5 },
     fade: T.fade,
-    brand: { name: wf.product ?? wf.title },
+    brand: timelineBrand(opts.brand, wf.product),
     intro: {
-      eyebrow: wf.intro?.eyebrow ?? "",
+      eyebrow: wf.intro?.eyebrow ?? "How to",
       titleHtml: escapeHtml(wf.intro?.title ?? wf.title),
       subtitle: wf.intro?.subtitle ?? "",
     },

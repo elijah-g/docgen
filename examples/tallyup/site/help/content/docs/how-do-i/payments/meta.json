@@ -1,0 +1,9 @@
+{
+  "title": "Payments",
+  "pages": [
+    "filter-unpaid-entries",
+    "record-a-payment",
+    "..."
+  ],
+  "generated": true
+}
