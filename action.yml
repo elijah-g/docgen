@@ -17,10 +17,10 @@ inputs:
     description: "URL the app is already running at (the workflow starts it before calling this action)."
     required: true
   base:
-    description: "Git ref/sha to diff against. Usually ${{ github.event.pull_request.base.sha }}."
+    description: "Git ref/sha to diff against. Usually `github.event.pull_request.base.sha`."
     required: true
   head:
-    description: "Git ref/sha to diff. Usually ${{ github.sha }}. Default HEAD."
+    description: "Git ref/sha to diff. Usually `github.sha`. Default HEAD."
     required: false
     default: "HEAD"
   github-token:
