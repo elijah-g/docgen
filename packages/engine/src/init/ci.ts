@@ -182,8 +182,8 @@ ${docsRepoStep}      - uses: actions/setup-node@v4
       - name: Remove this PR's preview folder
         run: |
           rm -rf "pr-\${{ github.event.pull_request.number }}"
-          git -c user.email=docgen-ci@users.noreply.github.com -c user.name=docgen-ci add -A
-          git diff --cached --quiet || git commit -m "prune previews for closed PR #\${{ github.event.pull_request.number }}"
+          git add -A
+          git diff --cached --quiet || git -c user.email=docgen-ci@users.noreply.github.com -c user.name=docgen-ci commit -m "prune previews for closed PR #\${{ github.event.pull_request.number }}"
           git push origin docgen-previews
 
   docgen-publish:

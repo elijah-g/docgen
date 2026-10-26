@@ -109,3 +109,21 @@ describe("writeCiWorkflow", () => {
     expect(content).toContain("config: .docgen-docs/help/docgen.config.ts");
   });
 });
+
+describe("generated workflow git identity", () => {
+  it("sets the committer identity on every git commit (runners have none)", async () => {
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { writeCiWorkflow } = await import("../../src/init/ci.js");
+    const dir = mkdtempSync(join(tmpdir(), "docgen-ci-ident-"));
+    try {
+      const { file } = writeCiWorkflow({ appRepo: dir } as Parameters<typeof writeCiWorkflow>[0]);
+      const commits = readFileSync(file, "utf8").split("\n").filter((l) => /\bgit\b.*\bcommit\b/.test(l));
+      expect(commits.length).toBeGreaterThan(0);
+      for (const line of commits) expect(line).toContain("user.name=docgen-ci");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
