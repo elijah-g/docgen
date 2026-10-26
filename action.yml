@@ -27,10 +27,15 @@ inputs:
     description: "Token used to push preview images to the docgen-previews branch and post/update the PR comment. Usually secrets.GITHUB_TOKEN — no other key is needed."
     required: true
   pr-number:
-    description: "Pull request number, for the PR comment."
-    required: true
+    description: "Pull request number, for the PR comment. Not used with publish."
+    required: false
+    default: ""
   is-fork:
     description: "\"true\" when the PR's head repo isn't this repo. GitHub always gives a fork PR a read-only token, so this skips the push-to-docgen-previews/post-comment step and uploads the diff as an Actions artifact instead. Default false."
+    required: false
+    default: "false"
+  publish:
+    description: "\"true\" on a push to main: re-capture what --base..--head touched and write refreshed screenshots and pages into the help app (no PR comment). The calling workflow commits the docs folder afterwards."
     required: false
     default: "false"
 
@@ -79,19 +84,32 @@ runs:
         DOCGEN_APP_URL: ${{ inputs.app-url }}
         DOCGEN_PR: ${{ inputs.pr-number }}
         DOCGEN_IS_FORK: ${{ inputs.is-fork }}
+        DOCGEN_PUBLISH: ${{ inputs.publish }}
       working-directory: ${{ github.workspace }}
       run: |
+        cli="$DOCGEN_ACTION_PATH/packages/engine/dist/cli.js"
+        result="$RUNNER_TEMP/docgen-ci-result.json"
+        if [ "$DOCGEN_PUBLISH" = "true" ]; then
+          node "$cli" ci --publish \
+            --config "$DOCGEN_CONFIG" \
+            --base "$DOCGEN_BASE" \
+            --head "$DOCGEN_HEAD" \
+            --app-url "$DOCGEN_APP_URL" \
+            --json | tee "$result"
+          node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));console.log('ok='+Boolean(r.ok));console.log('artifact=false')" "$result" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
         fork_flag=()
         if [ "$DOCGEN_IS_FORK" = "true" ]; then fork_flag=(--fork-pr); fi
-        node "$DOCGEN_ACTION_PATH/packages/engine/dist/cli.js" ci \
+        node "$cli" ci \
           --config "$DOCGEN_CONFIG" \
           --base "$DOCGEN_BASE" \
           --head "$DOCGEN_HEAD" \
           --app-url "$DOCGEN_APP_URL" \
           --pr "$DOCGEN_PR" \
           "${fork_flag[@]}" \
-          --json | tee docgen-ci-result.json
-        node -e "const r=JSON.parse(require('fs').readFileSync('docgen-ci-result.json','utf8'));console.log('ok='+Boolean(r.ok));console.log('artifact='+(r.commentAction==='artifact'));console.log('artifact-dir='+(r.artifactDir||''))" >> "$GITHUB_OUTPUT"
+          --json | tee "$result"
+        node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));console.log('ok='+Boolean(r.ok));console.log('artifact='+(r.commentAction==='artifact'));console.log('artifact-dir='+(r.artifactDir||''))" "$result" >> "$GITHUB_OUTPUT"
 
     - name: Upload diff as an artifact (fork PR, or the comment/push step failed)
       if: steps.run.outputs.artifact == 'true'
