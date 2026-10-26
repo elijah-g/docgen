@@ -9,6 +9,12 @@
  */
 @import "./brand.css";
 
+/* Paint the theme background on the root too, so no browser shows its own canvas colour at the
+ * page edges (wide screens, overscroll). */
+html {
+  background-color: var(--color-fd-background);
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
