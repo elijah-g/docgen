@@ -29,6 +29,12 @@ h4,
   font-family: var(--font-heading);
 }
 
+/* ---- Layout: use the full window width, so the sidebar sits against the left edge on wide
+ * screens instead of floating inside a centred 97rem column. Pages keep their own reading width. */
+:root {
+  --fd-layout-width: 100vw;
+}
+
 /* ---- Sidebar: brand-tinted active item, a little more air between groups. */
 #nd-sidebar a[data-active="true"] {
   background-color: color-mix(in oklab, var(--color-fd-primary) 10%, transparent);
