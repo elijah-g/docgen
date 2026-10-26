@@ -94,6 +94,9 @@ shared app/db, so capture itself must never run from two subagents at once (see 
   updates the same page (a toast, an updated heading, a closed dialog). Run `docgen inspect` again
   right after the save to see what actually changed, and write a `waitFor`/`expect` against that
   (the toast text, the new heading, the dialog closing) instead of guessing `waitForUrl`.
+- `highlight: true` must sit on the action whose target the doc screenshot actually shows — never
+  on a click that navigates away, or the box lands over whatever's now sitting in that spot on the
+  new page; put it on the `expect`/`waitFor` after the navigation instead.
 
 ## Token rules
 

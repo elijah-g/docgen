@@ -17,6 +17,7 @@ import { assertLocalDatabase, assertWritesAllowed } from "./write-guard.js";
 import { buildFailureReport } from "./failure-report.js";
 import { ImpactTracker } from "./impact.js";
 import type {
+  Box,
   CaptureEvent,
   CaptureManifest,
   CheckResult,
@@ -67,7 +68,7 @@ const noop = (): void => {};
  * then skip it rather than drawing a stale/wrong box. */
 async function resolveOverlayBoxes(
   page: Page,
-  items: Array<{ id: string; target?: Target; box?: import("./types.js").Box }> | undefined,
+  items: Array<{ id: string; target?: Target; box?: Box }> | undefined,
 ): Promise<ResolvedBox[]> {
   if (!items || items.length === 0) return [];
   const out: ResolvedBox[] = [];
@@ -254,19 +255,38 @@ export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult
       let failedAction: Action | undefined;
       let calloutBoxes: ResolvedBox[] = [];
       let blurBoxes: ResolvedBox[] = [];
+      let docHighlights: Box[] = [];
+      const highlightState: HighlightState = { target: null };
 
       try {
         const acts = step.actions;
         for (let ai = 0; ai < acts.length; ai++) {
           const a = acts[ai];
           failedAction = a;
-          ai = await runAction({ page, step, a, acts, ai, events, shot, stepResult, baseOrigin, maxTypeMs });
+          ai = await runAction({ page, step, a, acts, ai, events, shot, stepResult, baseOrigin, maxTypeMs, highlightState });
         }
         // Resolve callout/blur target boxes against the page in the state it's in right after
         // this step's actions ran — the same moment the step's doc screenshot is taken from, so
         // a pinned box matches what that screenshot (and the video frame built from it) shows.
         calloutBoxes = await resolveOverlayBoxes(page, step.callouts);
         blurBoxes = await resolveOverlayBoxes(page, step.blur);
+        // A highlight box is only meaningful on the doc screenshot if it describes where its
+        // element sits *right now* — a box captured at click time (before a navigating click, say)
+        // can land over unrelated content once the page has moved on. Re-resolve whatever
+        // highlight is still "on" (see HighlightState) against the current page rather than
+        // reusing whatever box an earlier action captured; if the target is gone or hidden, drop
+        // it from the doc screenshot (it's still shown correctly, at the right moment, in the
+        // video via the per-action highlight/clearHighlight events above).
+        if (highlightState.target) {
+          const box = await boxOf(highlightState.target, page).catch(() => null);
+          if (box) {
+            docHighlights = [box];
+          } else {
+            log(
+              `  step ${step.id ?? step.title ?? si}: highlight target no longer visible after this step's actions — dropping it from the doc screenshot`,
+            );
+          }
+        }
         if (step.camera && step.camera !== "full" && step.camera.focus) {
           const b = await boxOf(step.camera.focus, page).catch(() => null);
           if (b) {
@@ -296,13 +316,12 @@ export async function runCapture(opts: CaptureOptions): Promise<CaptureRunResult
 
       stepResult.ms = Date.now() - started;
       results.push(stepResult);
-      const highlights = events.filter((e): e is { type: "highlight"; box: import("./types.js").Box } => e.type === "highlight").map((e) => e.box);
       manifest.steps.push({
         id: step.id,
         camera: step.camera ?? "full",
         cameraBox: events.cameraBox ?? null,
         events: events.filter(Boolean),
-        doc: { image: snapshotForDoc, highlights, callouts: calloutBoxes, blur: blurBoxes },
+        doc: { image: snapshotForDoc, highlights: docHighlights, callouts: calloutBoxes, blur: blurBoxes },
         impact: impact.take(),
         checks: stepResult.checks,
       });
@@ -402,6 +421,9 @@ interface RunActionArgs {
   baseOrigin: string;
   /** Config `capture.maxTypeMs` (default 1500) — see the `type` case below. */
   maxTypeMs: number;
+  /** Shared across every action in this step — updated whenever a `highlight`/`clearHighlight`
+   * event is pushed so the step loop can re-resolve whatever's still "on" once actions finish. */
+  highlightState: HighlightState;
 }
 
 /** True when `target`'s `label` is one of `step.mask`'s field names. */
@@ -447,7 +469,19 @@ export async function comboboxShowsOption(trigger: ElementHandle<Element>, optio
 }
 
 /** Executes one action, mutating `events`/`stepResult`. Returns the action index to resume from. */
-async function runAction({ page, step, a, acts, ai, events, shot, stepResult, baseOrigin, maxTypeMs }: RunActionArgs): Promise<number> {
+async function runAction({
+  page,
+  step,
+  a,
+  acts,
+  ai,
+  events,
+  shot,
+  stepResult,
+  baseOrigin,
+  maxTypeMs,
+  highlightState,
+}: RunActionArgs): Promise<number> {
   const viewportWidth = page.viewportSize()?.width ?? 1440;
 
   // Writes must never land on a page that has drifted off-origin (an
@@ -466,7 +500,10 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       pushCheck(stepResult, { expect: a.target, ok: true });
       if (a.highlight) await smoothScrollTo(page, a.highlight === true ? a.target : a.highlight, events, shot, { margin: 24 }, step.mask);
       const hb = await highlightBox(page, a.highlight, a.target);
-      if (hb) events.push({ type: "highlight", box: hb }, { type: "hold", seconds: 0.6 });
+      if (hb) {
+        events.push({ type: "highlight", box: hb }, { type: "hold", seconds: 0.6 });
+        highlightState.target = highlightTargetOf(a.highlight, a.target);
+      }
       return ai;
     }
     case "waitFor": {
@@ -475,7 +512,10 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       events.push({ type: "frame", image: await shot("state", step.mask), transition: "fade" });
       pushCheck(stepResult, { waitFor: a.target, ok: true });
       const hb = await highlightBox(page, a.highlight, a.target);
-      if (hb) events.push({ type: "highlight", box: hb });
+      if (hb) {
+        events.push({ type: "highlight", box: hb });
+        highlightState.target = highlightTargetOf(a.highlight, a.target);
+      }
       return ai;
     }
     case "waitForUrl": {
@@ -524,7 +564,10 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       events.push({ type: "move", to: pt });
       events.push({ type: "frame", image: await shot("hover", step.mask), transition: "cut" });
       const hb = await highlightBox(page, a.highlight, a.target);
-      if (hb) events.push({ type: "highlight", box: hb });
+      if (hb) {
+        events.push({ type: "highlight", box: hb });
+        highlightState.target = highlightTargetOf(a.highlight, a.target);
+      }
       if (a.do === "point") {
         events.push({ type: "hold", seconds: 0.8 });
         pushCheck(stepResult, { point: a.target, ok: true });
@@ -533,6 +576,12 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       events.push({ type: "click", at: pt });
       await loc.click({ position: { x: pt.x - box.x, y: pt.y - box.y } });
       pushCheck(stepResult, { click: a.target, ok: true });
+
+      // A click may navigate: whatever was highlighted at click time (`hb` above) belongs to the
+      // page as it was *before* this click, so it must not survive as "the current highlight"
+      // past this point — it's re-asserted below only if a wait that follows asks for its own
+      // highlight on the page the click lands on.
+      highlightState.target = null;
 
       // Consume the waits that belong to this click before showing the result.
       let i = ai;
@@ -549,12 +598,16 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
           await paint(page);
           events.push({ type: "clearHighlight" }, { type: "frame", image: await shot("state", step.mask), transition: "fade" });
           const wb = await highlightBox(page, w.highlight, w.target);
-          if (wb) events.push({ type: "highlight", box: wb });
+          if (wb) {
+            events.push({ type: "highlight", box: wb });
+            highlightState.target = highlightTargetOf(w.highlight, w.target);
+          }
           events.push({ type: "hold", seconds: 0.9 });
         }
       }
       await settle(page);
       events.push({ type: "clearHighlight" }, { type: "frame", image: await shot("state", step.mask), transition: "fade" });
+      highlightState.target = null;
       return i;
     }
     case "select": {
@@ -576,7 +629,10 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       events.push({ type: "move", to: pt });
       events.push({ type: "frame", image: await shot("hover", step.mask), transition: "cut" });
       const hb = await highlightBox(page, a.highlight, a.target);
-      if (hb) events.push({ type: "highlight", box: hb });
+      if (hb) {
+        events.push({ type: "highlight", box: hb });
+        highlightState.target = highlightTargetOf(a.highlight, a.target);
+      }
 
       const isNativeSelect = await loc.evaluate((el) => el.tagName === "SELECT").catch(() => false);
       events.push({ type: "click", at: pt });
@@ -606,6 +662,7 @@ async function runAction({ page, step, a, acts, ai, events, shot, stepResult, ba
       pushCheck(stepResult, { select: a.target, option: a.option, ok: true });
       await settle(page);
       events.push({ type: "clearHighlight" }, { type: "frame", image: await shot("state", step.mask), transition: "fade" });
+      highlightState.target = null;
       return ai;
     }
     case "type": {
@@ -668,8 +725,25 @@ async function highlightBox(
   page: Page,
   spec: boolean | Target | undefined,
   target: Target,
-): Promise<import("./types.js").Box | null> {
+): Promise<Box | null> {
   if (!spec) return null;
   if (spec === true) return boxOf(target, page);
   return boxOf(spec, page);
+}
+
+/** The `Target` a highlight spec actually points at (same resolution `highlightBox` uses), so the
+ * caller can re-resolve the same element's box later rather than reusing a box captured at a
+ * different moment on a possibly different page. */
+function highlightTargetOf(spec: boolean | Target | undefined, target: Target): Target | null {
+  if (!spec) return null;
+  return spec === true ? target : spec;
+}
+
+/** Tracks which highlight (if any) is still "on" at any point in a step's action stream, so the
+ * doc screenshot can draw whatever is on-screen right now rather than every box a `highlight:
+ * true` action ever produced mid-step. A `click`/`select` always clears its own highlight once
+ * the resulting page has settled (see runAction) — a highlight only survives to the end of a step
+ * when nothing after it cleared it (typically a trailing `expect`/`waitFor`/`point`). */
+interface HighlightState {
+  target: Target | null;
 }

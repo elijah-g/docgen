@@ -101,6 +101,7 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - 2026-10-25 · M19 done after review (repair workflow refuses fork PR code; publish job commits only the docs folder). Full suite 945 pass / 11 skipped. All milestones M0–M22 done; live GitHub run pending a test PR.
 - 2026-10-26 · M23 done (four builders in parallel: brand/theme, video + PDF brand, library hierarchy, Studio; orchestrator built the site). Full suite 1053 pass / 11 skipped; typecheck clean; skills 64/64; TallyUp example `next build` passes.
 - 2026-10-26 · Live on GitHub (TallyUp main + throwaway PR #1, closed). Bugs found only live and fixed: `${{ }}` in action.yml input descriptions stopped GitHub loading the action; previews-branch and prune commits had no git identity on the runner; `ci --publish` didn't refresh public/screenshots (the PR baseline). Walkthrough fixes: baselines re-taken on GitHub's runner (server vs runner rendering differed ~0.01%); the phone walkthrough was written against `training` (save goes to the profile there, the list on main) and screenshotted mid-navigation. Final: two PR runs in a row reported only the real change (reworded Notes label), 3 unchanged. Broken tier also seen live (a bad `exact: true`).
+- 2026-10-26 · Doc screenshot highlights re-resolved on the page actually shown; a highlight whose element is gone after navigation is dropped with a warning. Full suite 1057 pass / 11 skipped.
 
 ## Follow-ups
 
@@ -119,6 +120,4 @@ Newest last. One line per loop turn: date, milestone, result, anything blocked.
 - Publish-on-merge commits to main, which redeploys hosts that build on every push (TallyUp's Amplify).
 - TallyUp CI schema: `get_show_id_for_entry()` has no tracked definition (training only); its index is skipped in CI.
 - Scaffolded help apps don't update when the template changes (examples/tallyup was missing M21/M22 until synced by hand): add `docgen upgrade` (scope.md risks table).
-- Highlight drawn at click time stays on the doc screenshot after the click navigates away (fix in progress).
-- Partial `ci --publish` rebuilds search-index.json/llms.txt from this run's pages only: check other pages aren't dropped.
 - Phase 1 gate needs an outside vibe coder.

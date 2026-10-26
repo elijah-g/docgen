@@ -92,6 +92,9 @@ page HTML, console log, video, or the rest of the app.
 - Respect locks: `docgen edit` already refuses to overwrite a locked step, but if it does, suggest
   the change in your report instead of forcing it (see `docs/scope.md` → "How edits stay safe").
 - Never loosen a `check`/`expect` just to make capture pass — that hides a real break.
+- If a doc screenshot shows a highlight box over the wrong thing, check whether `highlight: true`
+  sits on a click that navigates away — move it to the `expect`/`waitFor` after the navigation so
+  it highlights what that screenshot actually shows.
 
 ## Token rules
 
